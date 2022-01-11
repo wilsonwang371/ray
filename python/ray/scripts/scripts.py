@@ -304,6 +304,13 @@ def debug(address):
     type=int,
     help="Port number for the GCS server.")
 @click.option(
+    "--no-gcs-server",
+    is_flag=True,
+    hidden=True,
+    default=False,
+    help="If True, the ray GCS server for this cluster will not be "
+    "started.")
+@click.option(
     "--min-worker-port",
     required=False,
     type=int,
@@ -479,7 +486,7 @@ def debug(address):
     "safe to activate if the node is behind a firewall.")
 @add_click_options(logging_options)
 def start(node_ip_address, address, port, redis_password, redis_shard_ports,
-          object_manager_port, node_manager_port, gcs_server_port,
+          object_manager_port, node_manager_port, gcs_server_port, no_gcs_server,
           min_worker_port, max_worker_port, worker_port_list,
           ray_client_server_port, memory, object_store_memory,
           redis_max_memory, num_cpus, num_gpus, resources, head,
@@ -526,6 +533,7 @@ def start(node_ip_address, address, port, redis_password, redis_shard_ports,
         object_manager_port=object_manager_port,
         node_manager_port=node_manager_port,
         gcs_server_port=gcs_server_port,
+        no_gcs_server=no_gcs_server,
         memory=memory,
         object_store_memory=object_store_memory,
         redis_password=redis_password,

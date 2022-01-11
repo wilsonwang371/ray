@@ -190,8 +190,8 @@ RAY_CONFIG(int64_t, worker_register_timeout_seconds, 30)
 RAY_CONFIG(uint32_t, worker_max_resource_analysis_iteration, 128);
 
 /// Allow up to 5 seconds for connecting to Redis.
-RAY_CONFIG(int64_t, redis_db_connect_retries, 50)
-RAY_CONFIG(int64_t, redis_db_connect_wait_milliseconds, 100)
+RAY_CONFIG(int64_t, redis_db_connect_retries, 500)
+RAY_CONFIG(int64_t, redis_db_connect_wait_milliseconds, 500)
 
 /// The object manager's global timer interval in milliseconds.
 RAY_CONFIG(int, object_manager_timer_freq_ms, 100)

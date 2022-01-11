@@ -26,12 +26,12 @@
 DEFINE_string(redis_address, "", "The ip address of redis.");
 DEFINE_int32(redis_port, -1, "The port of redis.");
 DEFINE_string(log_dir, "", "The path of the dir where log files are created.");
+DEFINE_string(gcs_server_address, "", "The ip address of gcs server.");
 DEFINE_int32(gcs_server_port, 0, "The port of gcs server.");
 DEFINE_int32(metrics_agent_port, -1, "The port of metrics agent.");
 DEFINE_string(config_list, "", "The config list of raylet.");
 DEFINE_string(redis_password, "", "The password of redis.");
 DEFINE_bool(retry_redis, false, "Whether we retry to connect to the redis.");
-DEFINE_string(node_ip_address, "", "The ip address of the node.");
 
 int main(int argc, char *argv[]) {
   InitShutdownRAII ray_log_shutdown_raii(ray::RayLog::StartRayLog,
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
       << "config_list is not a valid base64-encoded string.";
   const std::string redis_password = FLAGS_redis_password;
   const bool retry_redis = FLAGS_retry_redis;
-  const std::string node_ip_address = FLAGS_node_ip_address;
+  const std::string gcs_server_address = FLAGS_gcs_server_address;
   gflags::ShutDownCommandLineFlags();
 
   RayConfig::instance().initialize(config_list);
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
   const ray::stats::TagsType global_tags = {
       {ray::stats::ComponentKey, "gcs_server"},
       {ray::stats::VersionKey, kRayVersion},
-      {ray::stats::NodeAddressKey, node_ip_address}};
+      {ray::stats::NodeAddressKey, gcs_server_address}};
   ray::stats::Init(global_tags, metrics_agent_port);
 
   // Initialize event framework.
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
   gcs_server_config.redis_port = redis_port;
   gcs_server_config.redis_password = redis_password;
   gcs_server_config.retry_redis = retry_redis;
-  gcs_server_config.node_ip_address = node_ip_address;
+  gcs_server_config.gcs_server_address = gcs_server_address;
   gcs_server_config.grpc_based_resource_broadcast =
       RayConfig::instance().grpc_based_resource_broadcast();
   gcs_server_config.grpc_pubsub_enabled = RayConfig::instance().gcs_grpc_based_pubsub();

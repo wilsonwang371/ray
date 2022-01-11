@@ -83,6 +83,8 @@ _GRPC_KEEPALIVE_TIME_MS = 60 * 1000
 # Keepalive should be replied < 60s
 _GRPC_KEEPALIVE_TIMEOUT_MS = 60 * 1000
 
+_MAX_GET_GCS_SERVER_ADDRESS_COUNT = 200
+
 # Also relying on these defaults:
 # grpc.keepalive_permit_without_calls=0: No keepalive without inflight calls.
 # grpc.use_local_subchannel_pool=0: Subchannels are shared.
@@ -102,10 +104,14 @@ def get_gcs_address_from_redis(redis) -> str:
     Returns:
         GCS address string.
     """
-    gcs_address = redis.get("GcsServerAddress")
-    if gcs_address is None:
-        raise RuntimeError("Failed to look up gcs address through redis")
-    return gcs_address.decode()
+    count = 0
+    while count < _MAX_GET_GCS_SERVER_ADDRESS_COUNT:
+        gcs_address = redis.get("GcsServerAddress")
+        if gcs_address is not None:
+            return gcs_address.decode()
+        count += 1
+        time.sleep(1)
+    raise RuntimeError("Failed to look up gcs address through redis")
 
 
 def create_gcs_channel(address: str, aio=False):

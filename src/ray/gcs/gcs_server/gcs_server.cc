@@ -35,7 +35,7 @@ GcsServer::GcsServer(const ray::gcs::GcsServerConfig &config,
     : config_(config),
       main_service_(main_service),
       rpc_server_(config.grpc_server_name, config.grpc_server_port,
-                  config.node_ip_address == "127.0.0.1", config.grpc_server_thread_num,
+                  config.gcs_server_address == "127.0.0.1", config.grpc_server_thread_num,
                   /*keepalive_time_ms=*/RayConfig::instance().grpc_keepalive_time_ms()),
       client_call_manager_(main_service,
                            RayConfig::instance().gcs_server_rpc_client_thread_num()),
@@ -329,7 +329,7 @@ void GcsServer::InitGcsPlacementGroupManager(const GcsInitData &gcs_init_data) {
 }
 
 void GcsServer::StoreGcsServerAddressInRedis() {
-  std::string ip = config_.node_ip_address;
+  std::string ip = config_.gcs_server_address;
   if (ip.empty()) {
     ip = GetValidLocalIp(
         GetPort(),

@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 SESSION_LATEST = "session_latest"
 NUM_PORT_RETRIES = 40
-NUM_REDIS_GET_RETRIES = 20
+NUM_REDIS_GET_RETRIES = 200
 
 
 class Node:
@@ -901,7 +901,8 @@ class Node:
         # If this is the head node, start the relevant head node processes.
         self.start_redis()
 
-        self.start_gcs_server()
+        if not self._ray_params.no_gcs_server:
+            self.start_gcs_server()
         if not self._ray_params.no_monitor:
             self.start_monitor()
 

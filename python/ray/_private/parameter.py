@@ -41,6 +41,8 @@ class RayParams:
         object_manager_port int: The port to use for the object manager.
         node_manager_port: The port to use for the node manager.
         gcs_server_port: The port to use for the GCS server.
+        no_gcs_server(bool): If True, the ray GCS server for this cluster
+            will not be started.
         node_ip_address (str): The IP address of the node that we are on.
         raylet_ip_address (str): The IP address of the raylet that this node
             connects to.
@@ -135,6 +137,7 @@ class RayParams:
                  object_manager_port=None,
                  node_manager_port=0,
                  gcs_server_port=None,
+                 no_gcs_server=False,
                  node_ip_address=None,
                  raylet_ip_address=None,
                  min_worker_port=None,
@@ -187,6 +190,7 @@ class RayParams:
         self.object_manager_port = object_manager_port
         self.node_manager_port = node_manager_port
         self.gcs_server_port = gcs_server_port
+        self.no_gcs_server = no_gcs_server
         self.node_ip_address = node_ip_address
         self.raylet_ip_address = raylet_ip_address
         self.min_worker_port = min_worker_port

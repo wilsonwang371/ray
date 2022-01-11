@@ -11,6 +11,8 @@ import json
 from multiprocessing.synchronize import Event
 from typing import Optional
 
+GET_GCS_ADDRESS_MAX_RETRIES = 20
+
 try:
     import prometheus_client
 except ImportError:
@@ -149,7 +151,7 @@ class Monitor:
                            f"{monitor_ip}:{AUTOSCALER_METRIC_PORT}")
         (ip, port) = redis_address.split(":")
         # Initialize the gcs stub for getting all node resource usage.
-        gcs_address = self.redis.get("GcsServerAddress").decode("utf-8")
+        gcs_address = self._get_gcs_address()
         options = (("grpc.enable_http_proxy", 0), )
         gcs_channel = ray._private.utils.init_grpc_channel(
             gcs_address, options)
@@ -204,6 +206,17 @@ class Monitor:
                            "not be exported.")
 
         logger.info("Monitor: Started")
+
+    def _get_gcs_address(self):
+        count = 0
+        while count < GET_GCS_ADDRESS_MAX_RETRIES:
+            gcs_address_raw = self.redis.get("GcsServerAddress")
+            if gcs_address_raw is not None:
+                return gcs_address_raw.decode("utf-8")
+            count += 1
+            time.sleep(1)
+        logger.error("Monitor: failed to get GCS server address")
+        raise Exception("Monitor: failed to get GCS server address")
 
     def _initialize_autoscaler(self):
         if self.autoscaling_config:
@@ -313,33 +326,36 @@ class Monitor:
     def _run(self):
         """Run the monitor loop."""
         while True:
-            if self.stop_event and self.stop_event.is_set():
-                break
-            self.update_load_metrics()
-            self.update_resource_requests()
-            self.update_event_summary()
-            status = {
-                "load_metrics_report": self.load_metrics.summary()._asdict(),
-                "time": time.time(),
-                "monitor_pid": os.getpid()
-            }
+            try:
+                if self.stop_event and self.stop_event.is_set():
+                    break
+                self.update_load_metrics()
+                self.update_resource_requests()
+                self.update_event_summary()
+                status = {
+                    "load_metrics_report": self.load_metrics.summary()._asdict(),
+                    "time": time.time(),
+                    "monitor_pid": os.getpid()
+                }
 
-            # Process autoscaling actions
-            if self.autoscaler:
-                # Only used to update the load metrics for the autoscaler.
-                self.autoscaler.update()
-                status[
-                    "autoscaler_report"] = self.autoscaler.summary()._asdict()
+                # Process autoscaling actions
+                if self.autoscaler:
+                    # Only used to update the load metrics for the autoscaler.
+                    self.autoscaler.update()
+                    status[
+                        "autoscaler_report"] = self.autoscaler.summary()._asdict()
 
-                for msg in self.event_summarizer.summary():
-                    logger.info("{}{}".format(
-                        ray_constants.LOG_PREFIX_EVENT_SUMMARY, msg))
-                self.event_summarizer.clear()
+                    for msg in self.event_summarizer.summary():
+                        logger.info("{}{}".format(
+                            ray_constants.LOG_PREFIX_EVENT_SUMMARY, msg))
+                    self.event_summarizer.clear()
 
-            as_json = json.dumps(status)
-            if _internal_kv_initialized():
-                _internal_kv_put(
-                    DEBUG_AUTOSCALING_STATUS, as_json, overwrite=True)
+                as_json = json.dumps(status)
+                if _internal_kv_initialized():
+                    _internal_kv_put(
+                        DEBUG_AUTOSCALING_STATUS, as_json, overwrite=True)
+            except Exception:
+                logger.error("Monitor: Execution exception. Trying again...")
 
             # Wait for a autoscaler update interval before processing the next
             # round of messages.

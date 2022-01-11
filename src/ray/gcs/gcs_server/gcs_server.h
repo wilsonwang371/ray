@@ -44,7 +44,7 @@ struct GcsServerConfig {
   uint16_t redis_port = 6379;
   bool retry_redis = true;
   bool enable_sharding_conn = true;
-  std::string node_ip_address;
+  std::string gcs_server_address;
   bool grpc_based_resource_broadcast = false;
   bool grpc_pubsub_enabled = false;
 };
