@@ -930,8 +930,6 @@ class Node:
         if use_gcs_for_bootstrap():
             self._gcs_address = (f"{self._node_ip_address}:"
                                  f"{gcs_server_port}")
-        # Initialize gcs client, which also waits for GCS to start running.
-        self.get_gcs_client()
 
     def start_raylet(self,
                      plasma_directory,
@@ -1052,7 +1050,6 @@ class Node:
         logger.debug(f"Process STDOUT and STDERR is being "
                      f"redirected to {self._logs_dir}.")
         assert self._redis_address is None
-        assert self._gcs_address is None
         assert self._gcs_client is None
 
         if not use_gcs_for_bootstrap() or \
@@ -1065,7 +1062,12 @@ class Node:
             # Wait for Redis to become available.
             self.create_redis_client()
 
-        self.start_gcs_server()
+        if self._gcs_address is None:
+            # Launch a local GCS server
+            self.start_gcs_server()
+
+        # Initialize gcs client, which also waits for GCS to start running.
+        self.get_gcs_client()
         assert self._gcs_client is not None
         self._write_cluster_info_to_kv()
 

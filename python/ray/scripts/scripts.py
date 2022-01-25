@@ -271,6 +271,11 @@ def debug(address):
     default=0,
     help="the port to use for starting the node manager")
 @click.option(
+    "--gcs-address",
+    required=False,
+    type=str,
+    help="the address to use for the GCS server.")
+@click.option(
     "--gcs-server-port",
     required=False,
     type=int,
@@ -452,7 +457,7 @@ def debug(address):
     "safe to activate if the node is behind a firewall.")
 @add_click_logging_options
 def start(node_ip_address, address, port, redis_password, redis_shard_ports,
-          object_manager_port, node_manager_port, gcs_server_port,
+          object_manager_port, node_manager_port, gcs_address, gcs_server_port,
           min_worker_port, max_worker_port, worker_port_list,
           ray_client_server_port, memory, object_store_memory,
           redis_max_memory, num_cpus, num_gpus, resources, head,
@@ -620,6 +625,10 @@ def start(node_ip_address, address, port, redis_password, redis_shard_ports,
                     "Please specify a different port using the `--port`"
                     " flag of `ray start` command.")
 
+        # If we specify gcs_address, lets use this one instead.
+        if gcs_address is not None:
+            ray_params.gcs_address = gcs_address
+
         node = ray.node.Node(
             ray_params, head=True, shutdown_at_exit=block, spawn_reaper=block)
 
@@ -724,6 +733,7 @@ def start(node_ip_address, address, port, redis_password, redis_shard_ports,
             raise Exception("Cannot canonicalize address "
                             f"`--address={address}`.")
 
+        assert gcs_address is None
         if use_gcs_for_bootstrap():
             ray_params.gcs_address = bootstrap_address
         else:

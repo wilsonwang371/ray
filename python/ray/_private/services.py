@@ -740,6 +740,8 @@ def start_ray_process(command,
                 f"command is limited to a total of 31767 characters, "
                 f"got {total_chrs}")
 
+    print("Running command: {}".format(' '.join(
+        ['\"{}\"'.format(x) for x in command])))
     process = ConsolePopen(
         command,
         env=modified_env,
