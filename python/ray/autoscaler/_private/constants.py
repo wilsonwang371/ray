@@ -74,7 +74,7 @@ RAY_HOME = "/home/ray"
 
 RAY_PROCESSES = [
     # The first element is the substring to filter.
-    # The second element, if True, is to filter ps results by command name
+    # The third element, if True, is to filter ps results by command name
     # (only the first 15 charactors of the executable name on Linux);
     # if False, is to filter ps results by command with all its arguments.
     # See STANDARD FORMAT SPECIFIERS section of
@@ -82,21 +82,22 @@ RAY_PROCESSES = [
     # about comm and args. This can help avoid killing non-ray processes.
     # Format:
     # Keyword to filter, filter by command (True)/filter by args (False)
-    ["raylet", True],
-    ["plasma_store", True],
-    ["gcs_server", True],
-    ["monitor.py", False],
-    ["ray.util.client.server", False],
-    ["redis-server", False],
-    ["default_worker.py", False],  # Python worker.
-    ["setup_worker.py", False],  # Python environment setup worker.
-    ["ray::", True],  # Python worker. TODO(mehrdadn): Fix for Windows
-    ["io.ray.runtime.runner.worker.DefaultWorker", False],  # Java worker.
-    ["log_monitor.py", False],
-    ["reporter.py", False],
-    [os.path.join("dashboard", "dashboard.py"), False],
-    [os.path.join("dashboard", "agent.py"), False],
-    ["ray_process_reaper.py", False],
+    [r"ray\"? start", True, False],
+    ["raylet", False, True],
+    ["plasma_store", False, True],
+    ["gcs_server", False, True],
+    ["monitor.py", False, False],
+    ["ray.util.client.server", False, False],
+    ["redis-server", False, False],
+    ["default_worker.py", False, False],  # Python worker.
+    ["setup_worker.py", False, False],  # Python environment setup worker.
+    ["ray::", False, True],  # Python worker. TODO(mehrdadn): Fix for Windows
+    ["io.ray.runtime.runner.worker.DefaultWorker", False, False],  # Java worker.
+    ["log_monitor.py", False, False],
+    ["reporter.py", False, False],
+    [os.path.join("dashboard", "dashboard.py"), False, False],
+    [os.path.join("dashboard", "agent.py"), False, False],
+    ["ray_process_reaper.py", False, False],
 ]
 
 # Max Concurrent SSH Calls to stop Docker

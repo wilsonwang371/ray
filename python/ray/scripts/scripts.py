@@ -13,6 +13,7 @@ import urllib
 import urllib.parse
 import yaml
 from socket import socket
+import re
 
 import ray
 import psutil
@@ -434,6 +435,13 @@ def debug(address):
     help="the file that contains the autoscaling config",
 )
 @click.option(
+    "--lite-head",
+    is_flag=True,
+    hidden=True,
+    default=False,
+    help="If True, the ray head node will not run worker and raylet process.",
+)
+@click.option(
     "--no-redirect-output",
     is_flag=True,
     default=False,
@@ -499,6 +507,13 @@ def debug(address):
     help="Make the Ray debugger available externally to the node. This is only"
     "safe to activate if the node is behind a firewall.",
 )
+@click.option(
+    "--restart-on-failure",
+    is_flag=True,
+    hidden=True,
+    default=False,
+    help="If True, blocked ray script will try to restart failed components.",
+)
 @add_click_logging_options
 def start(
     node_ip_address,
@@ -528,6 +543,7 @@ def start(
     block,
     plasma_directory,
     autoscaling_config,
+    lite_head,
     no_redirect_output,
     plasma_store_socket_name,
     raylet_socket_name,
@@ -538,6 +554,7 @@ def start(
     no_monitor,
     tracing_startup_hook,
     ray_debugger_external,
+    restart_on_failure,
 ):
     """Start Ray processes manually on the local machine."""
     if use_gcs_for_bootstrap() and gcs_server_port is not None:
@@ -546,6 +563,20 @@ def start(
             "GCS server port on head node.",
             cf.bold("--gcs-server-port"),
             cf.bold("--port"),
+        )
+
+    if lite_head and not head:
+        cli_logger.error(
+            "`{}` is required when {} is specified",
+            cf.bold("--head"),
+            cf.bold("--lite-head"),
+        )
+
+    if restart_on_failure and not block:
+        cli_logger.error(
+            "`{}` is required when {} is specified",
+            cf.bold("--head"),
+            cf.bold("--restart-on-failure"),
         )
 
     # Whether the original arguments include node_ip_address.
@@ -589,6 +620,7 @@ def start(
         autoscaling_config=autoscaling_config,
         plasma_directory=plasma_directory,
         huge_pages=False,
+        lite_head=lite_head,
         plasma_store_socket_name=plasma_store_socket_name,
         raylet_socket_name=raylet_socket_name,
         temp_dir=temp_dir,
@@ -899,12 +931,24 @@ def start(
                 cli_logger.error("Some Ray subprcesses exited unexpectedly:")
 
                 with cli_logger.indented():
-                    for process_type, process in deceased:
+                    for process_type, process, launch in deceased:
                         cli_logger.error(
                             "{}",
                             cf.bold(str(process_type)),
                             _tags={"exit code": str(process.returncode)},
                         )
+                        if restart_on_failure:
+                            if node.replace_process(process_type, process, launch()):
+                                cli_logger.print(
+                                    "{} restarted.", cf.bold(str(process_type))
+                                )
+                            else:
+                                cli_logger.print(
+                                    "restarting {} failed.", cf.bold(str(process_type))
+                                )
+
+                if restart_on_failure:
+                    continue
 
                 # shutdown_at_exit will handle cleanup.
                 cli_logger.newline()
@@ -946,7 +990,7 @@ def stop(force, grace_period):
             pass
 
     stopped = []
-    for keyword, filter_by_cmd in processes_to_kill:
+    for keyword, is_regex, filter_by_cmd in processes_to_kill:
         if filter_by_cmd and is_linux and len(keyword) > 15:
             # getting here is an internal bug, so we do not use cli_logger
             msg = (
@@ -959,19 +1003,29 @@ def stop(force, grace_period):
         for candidate in process_infos:
             proc, proc_cmd, proc_args = candidate
             corpus = proc_cmd if filter_by_cmd else subprocess.list2cmdline(proc_args)
-            if keyword in corpus:
-                # This is a way to avoid killing redis server that's not started by Ray.
-                # We are using a simple hacky solution here since
-                # Redis server will anyway removed soon from the ray repository.
-                # This feature is only supported on MacOS/Linux temporarily until
-                # Redis is removed from Ray.
-                if (
-                    keyword == "redis-server"
-                    and sys.platform != "win32"
-                    and "core/src/ray/thirdparty/redis/src/redis-server" not in corpus
-                ):
-                    continue
-                found.append(candidate)
+            if is_regex:
+                if re.search(keyword, corpus) is not None:
+                    if (
+                        "redis-server" in corpus
+                        and sys.platform != "win32"
+                        and "core/src/ray/thirdparty/redis/src/redis-server" not in corpus
+                    ):
+                        continue
+                    found.append(candidate)
+            else:
+                if keyword in corpus:
+                    # This is a way to avoid killing redis server that's not started by Ray.
+                    # We are using a simple hacky solution here since
+                    # Redis server will anyway removed soon from the ray repository.
+                    # This feature is only supported on MacOS/Linux temporarily until
+                    # Redis is removed from Ray.
+                    if (
+                        keyword == "redis-server"
+                        and sys.platform != "win32"
+                        and "core/src/ray/thirdparty/redis/src/redis-server" not in corpus
+                    ):
+                        continue
+                    found.append(candidate)
 
         for proc, proc_cmd, proc_args in found:
             proc_string = str(subprocess.list2cmdline(proc_args))

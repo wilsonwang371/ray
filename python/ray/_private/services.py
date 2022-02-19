@@ -87,6 +87,7 @@ ProcessInfo = collections.namedtuple(
         "use_valgrind_profiler",
         "use_perftools_profiler",
         "use_tmux",
+        "launch",
     ],
 )
 
@@ -775,24 +776,32 @@ def start_ray_process(
                 f"got {total_chrs}"
             )
 
-    process = ConsolePopen(
-        command,
-        env=modified_env,
-        cwd=cwd,
-        stdout=stdout_file,
-        stderr=stderr_file,
-        stdin=subprocess.PIPE if pipe_stdin else None,
-        preexec_fn=preexec_fn if sys.platform != "win32" else None,
-        creationflags=CREATE_SUSPENDED if win32_fate_sharing else 0,
-    )
+    def _launch():
+        print(
+            "CMD: **************\n{}\n**************".format(
+                " ".join(['"{}"'.format(x) for x in command])
+            )
+        )
 
-    if win32_fate_sharing:
-        try:
-            ray._private.utils.set_kill_child_on_death_win32(process)
-            psutil.Process(process.pid).resume()
-        except (psutil.Error, OSError):
-            process.kill()
-            raise
+        process = ConsolePopen(
+            command,
+            env=modified_env,
+            cwd=cwd,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            stdin=subprocess.PIPE if pipe_stdin else None,
+            preexec_fn=preexec_fn if sys.platform != "win32" else None,
+            creationflags=CREATE_SUSPENDED if win32_fate_sharing else 0,
+        )
+
+        if win32_fate_sharing:
+            try:
+                ray._private.utils.set_kill_child_on_death_win32(process)
+                psutil.Process(process.pid).resume()
+            except (psutil.Error, OSError):
+                process.kill()
+                raise
+        return process
 
     def _get_stream_name(stream):
         if stream is not None:
@@ -801,6 +810,8 @@ def start_ray_process(
             except AttributeError:
                 return str(stream)
         return None
+
+    process = _launch()
 
     return ProcessInfo(
         process=process,
@@ -811,6 +822,7 @@ def start_ray_process(
         use_valgrind_profiler=use_valgrind_profiler,
         use_perftools_profiler=use_perftools_profiler,
         use_tmux=use_tmux,
+        launch=_launch,
     )
 
 
@@ -2036,7 +2048,7 @@ def determine_plasma_store_config(
                     "sure to set this to more than 30% of available RAM.".format(
                         ray._private.utils.get_user_temp_dir(),
                         shm_avail,
-                        object_store_memory * (1.1) / (2 ** 30),
+                        object_store_memory * (1.1) / (2**30),
                     )
                 )
         else:
@@ -2088,16 +2100,16 @@ def determine_plasma_store_config(
             "`object_store_memory` when calling ray.init() or ray start."
             "To ignore this warning, "
             "set RAY_ENABLE_MAC_LARGE_OBJECT_STORE=1.".format(
-                object_store_memory / 2 ** 30,
-                ray_constants.MAC_DEGRADED_PERF_MMAP_SIZE_LIMIT / 2 ** 30,
-                ray_constants.MAC_DEGRADED_PERF_MMAP_SIZE_LIMIT / 2 ** 30,
+                object_store_memory / 2**30,
+                ray_constants.MAC_DEGRADED_PERF_MMAP_SIZE_LIMIT / 2**30,
+                ray_constants.MAC_DEGRADED_PERF_MMAP_SIZE_LIMIT / 2**30,
             )
         )
 
     # Print the object store memory using two decimal places.
     logger.debug(
         "Determine to start the Plasma object store with {} GB memory "
-        "using {}.".format(round(object_store_memory / 10 ** 9, 2), plasma_directory)
+        "using {}.".format(round(object_store_memory / 10**9, 2), plasma_directory)
     )
 
     return plasma_directory, object_store_memory

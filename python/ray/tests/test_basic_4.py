@@ -3,6 +3,7 @@ import logging
 import sys
 import time
 import subprocess
+import re
 
 import numpy as np
 import pytest
@@ -155,14 +156,18 @@ def test_listen_on_localhost(start_ray, request):
         except psutil.Error:
             pass
 
-    for keyword, filter_by_cmd in RAY_PROCESSES:
+    for keyword, is_regex, filter_by_cmd in RAY_PROCESSES:
         for candidate in process_infos:
             proc, proc_cmd, proc_cmdline = candidate
             corpus = (
                 proc_cmd if filter_by_cmd else subprocess.list2cmdline(proc_cmdline)
             )
-            if keyword not in corpus:
-                continue
+            if is_regex:
+                if re.search(keyword, corpus) is None:
+                    continue
+            else:
+                if keyword not in corpus:
+                    continue
 
             for connection in proc.connections():
                 if connection.status != psutil.CONN_LISTEN:

@@ -74,6 +74,8 @@ class RayParams:
             the environment for the worker process.
         huge_pages: Boolean flag indicating whether to start the Object
             Store with hugetlbfs support. Requires plasma_directory.
+        lite_head: Boolean flag indicating whether to start a lightweight
+            head node.
         include_dashboard: Boolean flag indicating whether to start the web
             UI, which displays the status of the Ray cluster. If this value is
             None, then the UI will be started if the relevant dependencies are
@@ -151,6 +153,7 @@ class RayParams:
         worker_path=None,
         setup_worker_path=None,
         huge_pages=False,
+        lite_head=False,
         include_dashboard=None,
         dashboard_host=ray_constants.DEFAULT_DASHBOARD_IP,
         dashboard_port=ray_constants.DEFAULT_DASHBOARD_PORT,
@@ -202,6 +205,7 @@ class RayParams:
         self.worker_path = worker_path
         self.setup_worker_path = setup_worker_path
         self.huge_pages = huge_pages
+        self.lite_head = lite_head
         self.include_dashboard = include_dashboard
         self.dashboard_host = dashboard_host
         self.dashboard_port = dashboard_port

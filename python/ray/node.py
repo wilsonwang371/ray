@@ -297,29 +297,32 @@ class Node:
                     ray_constants.KV_NAMESPACE_TRACING,
                 )
 
-        if not connect_only:
-            self.start_ray_processes()
-            # we should update the address info after the node has been started
-            try:
-                ray._private.services.wait_for_node(
+        if (head and not ray_params.lite_head) or not head:
+            # for head node, if we run in lite mode, we will skip starting
+            # ray processes.
+            if not connect_only:
+                self.start_ray_processes()
+                # we should update the address info after the node has been started
+                try:
+                    ray._private.services.wait_for_node(
+                        self.redis_address,
+                        self.gcs_address,
+                        self._plasma_store_socket_name,
+                        self.redis_password,
+                    )
+                except TimeoutError:
+                    raise Exception(
+                        "The current node has not been updated within 30 "
+                        "seconds, this could happen because of some of "
+                        "the Ray processes failed to startup."
+                    )
+                node_info = ray._private.services.get_node_to_connect_for_driver(
                     self.redis_address,
                     self.gcs_address,
-                    self._plasma_store_socket_name,
-                    self.redis_password,
+                    self._raylet_ip_address,
+                    redis_password=self.redis_password,
                 )
-            except TimeoutError:
-                raise Exception(
-                    "The current node has not been updated within 30 "
-                    "seconds, this could happen because of some of "
-                    "the Ray processes failed to startup."
-                )
-            node_info = ray._private.services.get_node_to_connect_for_driver(
-                self.redis_address,
-                self.gcs_address,
-                self._raylet_ip_address,
-                redis_password=self.redis_password,
-            )
-            self._ray_params.node_manager_port = node_info.node_manager_port
+                self._ray_params.node_manager_port = node_info.node_manager_port
 
         # Makes sure the Node object has valid addresses after setup.
         self.validate_ip_port(self.address)
@@ -1450,8 +1453,21 @@ class Node:
         for process_type, process_infos in self.all_processes.items():
             for process_info in process_infos:
                 if process_info.process.poll() is not None:
-                    result.append((process_type, process_info.process))
+                    result.append(
+                        (process_type, process_info.process, process_info.launch)
+                    )
         return result
+
+    def replace_process(self, process_type, old_process, new_process):
+        if process_type in self.all_processes:
+            for idx in range(len(self.all_processes[process_type])):
+                if old_process == self.all_processes[process_type][idx].process:
+                    new_process_info = self.all_processes[process_type][idx]._replace(
+                        process=new_process
+                    )
+                    self.all_processes[process_type][idx] = new_process_info
+                    return True
+        return False
 
     def any_processes_alive(self):
         """Return true if any processes are still alive.

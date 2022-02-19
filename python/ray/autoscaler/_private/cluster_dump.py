@@ -291,13 +291,19 @@ def get_local_ray_processes(
 
     relevant_processes = {}
     for process_dict, cmdline in process_infos:
-        for keyword, filter_by_cmd in processes:
+        for keyword, is_regex, filter_by_cmd in processes:
             if filter_by_cmd:
                 corpus = process_dict["name"]
             else:
                 corpus = subprocess.list2cmdline(cmdline)
-            if keyword in corpus and process_dict["pid"] not in relevant_processes:
-                relevant_processes[process_dict["pid"]] = process_dict
+            if is_regex:
+                if re.search(keyword, corpus) is not None:
+                    if process_dict["pid"] not in relevant_processes:
+                        relevant_processes[process_dict["pid"]] = process_dict
+            else:
+                if keyword in corpus:
+                    if process_dict["pid"] not in relevant_processes:
+                        relevant_processes[process_dict["pid"]] = process_dict
 
     with tempfile.NamedTemporaryFile("wt") as fp:
         for line in relevant_processes.values():
