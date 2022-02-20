@@ -37,6 +37,8 @@ class RayParams:
         object_manager_port int: The port to use for the object manager.
         node_manager_port: The port to use for the node manager.
         gcs_server_port: The port to use for the GCS server.
+        gcs_leader_election: Boolean flag indicating whether the GCS leader election
+            is enabled or not.
         node_ip_address (str): The IP address of the node that we are on.
         raylet_ip_address (str): The IP address of the raylet that this node
             connects to.
@@ -136,6 +138,7 @@ class RayParams:
         object_manager_port=None,
         node_manager_port=0,
         gcs_server_port=None,
+        gcs_leader_election=False,
         node_ip_address=None,
         raylet_ip_address=None,
         min_worker_port=None,
@@ -189,6 +192,7 @@ class RayParams:
         self.object_manager_port = object_manager_port
         self.node_manager_port = node_manager_port
         self.gcs_server_port = gcs_server_port
+        self.gcs_leader_election = gcs_leader_election
         self.node_ip_address = node_ip_address
         self.raylet_ip_address = raylet_ip_address
         self.min_worker_port = min_worker_port

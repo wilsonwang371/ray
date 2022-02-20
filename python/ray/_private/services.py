@@ -53,6 +53,7 @@ RAYLET_EXECUTABLE = os.path.join(RAY_PATH, "core/src/ray/raylet/raylet" + EXE_SU
 GCS_SERVER_EXECUTABLE = os.path.join(
     RAY_PATH, "core/src/ray/gcs/gcs_server" + EXE_SUFFIX
 )
+GCS_SERVER_WRAPPER_SCRIPT = "gcs_server_wrapper"
 
 # Location of the cpp default worker executables.
 DEFAULT_WORKER_EXECUTABLE = os.path.join(RAY_PATH, "cpp/default_worker" + EXE_SUFFIX)
@@ -1533,6 +1534,7 @@ def start_gcs_server(
     gcs_server_port=None,
     metrics_agent_port=None,
     node_ip_address=None,
+    gcs_leader_election=False,
 ):
     """Start a gcs server.
     Args:
@@ -1548,6 +1550,7 @@ def start_gcs_server(
         gcs_server_port (int): Port number of the gcs server.
         metrics_agent_port(int): The port where metrics agent is bound to.
         node_ip_address(str): IP Address of a node where gcs server starts.
+        gcs_leader_election(bool): If true, the GCS server leader election is enabled.
     Returns:
         ProcessInfo for the process that was started.
     """
@@ -1569,6 +1572,10 @@ def start_gcs_server(
         ]
     if redis_password:
         command += [f"--redis_password={redis_password}"]
+
+    if gcs_leader_election:
+        command = [GCS_SERVER_WRAPPER_SCRIPT] + command
+
     process_info = start_ray_process(
         command,
         ray_constants.PROCESS_TYPE_GCS_SERVER,

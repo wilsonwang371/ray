@@ -306,6 +306,12 @@ def debug(address):
     help="Port number for the GCS server.",
 )
 @click.option(
+    "--gcs-leader-election",
+    is_flag=True,
+    default=False,
+    help="provide this argument for the GCS server active-standby leader election.",
+)
+@click.option(
     "--min-worker-port",
     required=False,
     type=int,
@@ -524,6 +530,7 @@ def start(
     object_manager_port,
     node_manager_port,
     gcs_server_port,
+    gcs_leader_election,
     min_worker_port,
     max_worker_port,
     worker_port_list,
@@ -566,17 +573,30 @@ def start(
         )
 
     if lite_head and not head:
-        cli_logger.error(
+        cli_logger.abort(
             "`{}` is required when {} is specified",
             cf.bold("--head"),
             cf.bold("--lite-head"),
         )
 
     if restart_on_failure and not block:
-        cli_logger.error(
+        cli_logger.abort(
             "`{}` is required when {} is specified",
             cf.bold("--head"),
             cf.bold("--restart-on-failure"),
+        )
+
+    if use_gcs_for_bootstrap() and gcs_leader_election:
+        cli_logger.abort(
+            "Bootstrapping from GCS is required when {} is specified",
+            cf.bold("--gcs-leader-election"),
+        )
+
+    if not block and gcs_leader_election:
+        cli_logger.abort(
+            "`{}` is required when {} is specified",
+            cf.bold("--block"),
+            cf.bold("--gcs-leader-election"),
         )
 
     # Whether the original arguments include node_ip_address.
@@ -635,6 +655,7 @@ def start(
         no_monitor=no_monitor,
         tracing_startup_hook=tracing_startup_hook,
         ray_debugger_external=ray_debugger_external,
+        gcs_leader_election=gcs_leader_election,
     )
 
     if head:
@@ -1008,7 +1029,8 @@ def stop(force, grace_period):
                     if (
                         "redis-server" in corpus
                         and sys.platform != "win32"
-                        and "core/src/ray/thirdparty/redis/src/redis-server" not in corpus
+                        and "core/src/ray/thirdparty/redis/src/redis-server"
+                        not in corpus
                     ):
                         continue
                     found.append(candidate)
@@ -1022,7 +1044,8 @@ def stop(force, grace_period):
                     if (
                         keyword == "redis-server"
                         and sys.platform != "win32"
-                        and "core/src/ray/thirdparty/redis/src/redis-server" not in corpus
+                        and "core/src/ray/thirdparty/redis/src/redis-server"
+                        not in corpus
                     ):
                         continue
                     found.append(candidate)

@@ -280,6 +280,9 @@ if setup_spec.type == SetupType.RAY:
         "aiosignal",
         "frozenlist",
         "virtualenv",  # For pip runtime env.
+        "python-redis-lock",
+        "tornado",
+        "py-healthcheck",
     ]
 
 
@@ -738,6 +741,7 @@ setuptools.setup(
     entry_points={
         "console_scripts": [
             "ray=ray.scripts.scripts:main",
+            "gcs_server_wrapper=ray.scripts.gcs_server_wrapper:main",
             "rllib=ray.rllib.scripts:cli [rllib]",
             "tune=ray.tune.scripts:cli",
             "ray-operator=ray.ray_operator.operator:main",

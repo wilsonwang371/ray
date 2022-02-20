@@ -965,8 +965,11 @@ class Node:
         assert gcs_server_port > 0
         assert self._gcs_address is None, "GCS server is already running."
         assert self._gcs_client is None, "GCS client is already connected."
+        if self._ray_params.gcs_leader_election:
+            assert not use_gcs_for_bootstrap(), "GCS leader election cannot be used when bootstrapping using GCS."
         # TODO(mwtian): append date time so restarted GCS uses different files.
         stdout_file, stderr_file = self.get_log_file_handles("gcs_server", unique=True)
+
         process_info = ray._private.services.start_gcs_server(
             self.redis_address,
             self._logs_dir,
@@ -978,6 +981,7 @@ class Node:
             gcs_server_port=gcs_server_port,
             metrics_agent_port=self._ray_params.metrics_agent_port,
             node_ip_address=self._node_ip_address,
+            gcs_leader_election=self._ray_params.gcs_leader_election,
         )
         assert ray_constants.PROCESS_TYPE_GCS_SERVER not in self.all_processes
         self.all_processes[ray_constants.PROCESS_TYPE_GCS_SERVER] = [

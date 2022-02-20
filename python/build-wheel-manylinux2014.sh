@@ -12,10 +12,19 @@ EOF
 chmod +x /usr/bin/nproc
 
 NODE_VERSION="14"
-PYTHONS=("cp36-cp36m"
-         "cp37-cp37m"
-         "cp38-cp38"
-         "cp39-cp39")
+if [ ! -n "${PYTHONS:-}" ]; then
+  PYTHONS=("cp36-cp36m"
+          "cp37-cp37m"
+          "cp38-cp38"
+          "cp39-cp39")
+else
+  PYTHONS=(${PYTHONS})
+fi
+
+PYTHON_VERSIONS=("cp36-cp36m"
+                 "cp37-cp37m"
+                 "cp38-cp38"
+                 "cp39-cp39")
 
 NUMPY_VERSIONS=("1.14.5"
                 "1.14.5"
@@ -67,37 +76,44 @@ popd
 set -x
 
 mkdir -p .whl
-for ((i=0; i<${#PYTHONS[@]}; ++i)); do
-  PYTHON=${PYTHONS[i]}
-  NUMPY_VERSION=${NUMPY_VERSIONS[i]}
+for ((i=0; i<${#PYTHON_VERSIONS[@]}; ++i)); do
+  for ((j=0; j<${#PYTHONS[@]}; ++j)); do
+    if [ "${PYTHON_VERSIONS[i]}" != "${PYTHONS[j]}" ]; then
+      continue
+    fi
+    PYTHON_VERSION=${PYTHON_VERSIONS[i]}
+    NUMPY_VERSION=${NUMPY_VERSIONS[i]}
 
-  # The -f flag is passed twice to also run git clean in the arrow subdirectory.
-  # The -d flag removes directories. The -x flag ignores the .gitignore file,
-  # and the -e flag ensures that we don't remove the .whl directory, the
-  # dashboard directory and jars directory.
-  git clean -f -f -x -d -e .whl -e python/ray/dashboard/client -e dashboard/client -e python/ray/jars
-
-  pushd python
-    # Fix the numpy version because this will be the oldest numpy version we can
-    # support.
-    /opt/python/"${PYTHON}"/bin/pip install -q numpy=="${NUMPY_VERSION}" cython==0.29.26
-    # Set the commit SHA in __init__.py.
-    if [ -n "$TRAVIS_COMMIT" ]; then
-      sed -i.bak "s/{{RAY_COMMIT_SHA}}/$TRAVIS_COMMIT/g" ray/__init__.py && rm ray/__init__.py.bak
-    else
-      echo "TRAVIS_COMMIT variable not set - required to populated ray.__commit__."
-      exit 1
+    if [ ! -n "${NO_GITCLEAN:-}" ]; then
+      # The -f flag is passed twice to also run git clean in the arrow subdirectory.
+      # The -d flag removes directories. The -x flag ignores the .gitignore file,
+      # and the -e flag ensures that we don't remove the .whl directory, the
+      # dashboard directory and jars directory.
+      git clean -f -f -x -d -e .whl -e python/ray/dashboard/client -e dashboard/client -e python/ray/jars
     fi
 
-    # build ray wheel
-    PATH=/opt/python/${PYTHON}/bin:/root/bazel-3.2.0/output:$PATH \
-    /opt/python/"${PYTHON}"/bin/python setup.py bdist_wheel
-    # build ray-cpp wheel
-    PATH=/opt/python/${PYTHON}/bin:/root/bazel-3.2.0/output:$PATH \
-    RAY_INSTALL_CPP=1 /opt/python/"${PYTHON}"/bin/python setup.py bdist_wheel
-    # In the future, run auditwheel here.
-    mv dist/*.whl ../.whl/
-  popd
+    pushd python
+      # Fix the numpy version because this will be the oldest numpy version we can
+      # support.
+      /opt/python/"${PYTHON_VERSION}"/bin/pip install -q numpy=="${NUMPY_VERSION}" cython==0.29.26
+      # Set the commit SHA in __init__.py.
+      if [ -n "$TRAVIS_COMMIT" ]; then
+        sed -i.bak "s/{{RAY_COMMIT_SHA}}/$TRAVIS_COMMIT/g" ray/__init__.py && rm ray/__init__.py.bak
+      else
+        echo "TRAVIS_COMMIT variable not set - required to populated ray.__commit__."
+        exit 1
+      fi
+
+      # build ray wheel
+      PATH=/opt/python/${PYTHON_VERSION}/bin:/root/bazel-3.2.0/output:$PATH \
+      /opt/python/"${PYTHON_VERSION}"/bin/python setup.py bdist_wheel
+      # build ray-cpp wheel
+      PATH=/opt/python/${PYTHON_VERSION}/bin:/root/bazel-3.2.0/output:$PATH \
+      RAY_INSTALL_CPP=1 /opt/python/"${PYTHON_VERSION}"/bin/python setup.py bdist_wheel
+      # In the future, run auditwheel here.
+      mv dist/*.whl ../.whl/
+    popd
+  done
 done
 
 # Rename the wheels so that they can be uploaded to PyPI. TODO(rkn): This is a
@@ -111,5 +127,7 @@ for path in .whl/*.whl; do
   fi
 done
 
-# Clean the build output so later operations is on a clean directory.
-git clean -f -f -x -d -e .whl -e python/ray/dashboard/client
+if [ ! -n "${NO_GITCLEAN:-}" ]; then
+  # Clean the build output so later operations is on a clean directory.
+  git clean -f -f -x -d -e .whl -e python/ray/dashboard/client
+fi
