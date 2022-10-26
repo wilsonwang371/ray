@@ -101,6 +101,8 @@ _common_options = {
         )
     ),
     "_metadata": Option((dict, type(None))),
+    # this is for running a function with this customized option: fun2 = fun.options(wasm=True)
+    # "wasm": Option((bool, int, type(None))),
 }
 
 
@@ -142,6 +144,11 @@ _task_only_options = {
             )
         ),
         "retry_exceptions must be either a boolean or a list of exceptions",
+        default_value=False,
+    ),
+    # WILSON: wasm function
+    "wasm": Option(
+        (bool, int),
         default_value=False,
     ),
 }

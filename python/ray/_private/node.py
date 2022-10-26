@@ -136,6 +136,7 @@ class Node:
             include_log_monitor=True,
             resources={},
             temp_dir=ray._private.utils.get_ray_temp_dir(),
+            # WILSON: this is the place setting worker path.
             worker_path=os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
                 "workers",

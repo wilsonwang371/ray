@@ -121,6 +121,10 @@ class GcsActor {
       actor_table_data_.set_class_name(
           function_descriptor.python_function_descriptor().class_name());
       break;
+    case rpc::FunctionDescriptor::FunctionDescriptorCase::kWasmFunctionDescriptor:
+      actor_table_data_.set_class_name(
+          function_descriptor.wasm_function_descriptor().class_name());
+      break;
     default:
       // TODO (Alex): Handle the C++ case, which we currently don't have an
       // easy equivalent to class_name for.

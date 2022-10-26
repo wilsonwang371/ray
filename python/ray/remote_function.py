@@ -15,7 +15,7 @@ from ray._private.client_mode_hook import (
 )
 from ray._private.ray_option_utils import _warn_if_using_deprecated_placement_group
 from ray._private.utils import get_runtime_env_info, parse_runtime_env
-from ray._raylet import PythonFunctionDescriptor
+from ray._raylet import PythonFunctionDescriptor, WASMFunctionDescriptor
 from ray.util.annotations import DeveloperAPI, PublicAPI
 from ray.util.placement_group import _configure_placement_group_based_on_context
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
@@ -23,6 +23,7 @@ from ray.util.tracing.tracing_helper import (
     _inject_tracing_into_function,
     _tracing_task_invocation,
 )
+from ray.util import Module
 
 logger = logging.getLogger(__name__)
 
@@ -112,10 +113,10 @@ class RemoteFunction:
             self._default_options["runtime_env"] = self._runtime_env
 
         self._language = language
-        self._function = _inject_tracing_into_function(function)
-        self._function_name = function.__module__ + "." + function.__name__
+        self._function = function if isinstance(function, Module) else _inject_tracing_into_function(function)
+        self._function_name = (function.exports[0].name) if isinstance(function, Module) else  function.__module__ + "." + function.__name__
         self._function_descriptor = function_descriptor
-        self._is_cross_language = language != Language.PYTHON
+        self._is_cross_language = language != Language.PYTHON and language != Language.WASM
         self._decorator = getattr(function, "__ray_invocation_decorator__", None)
         self._function_signature = ray._private.signature.extract_signature(
             self._function
@@ -249,9 +250,31 @@ class RemoteFunction:
         worker = ray._private.worker.global_worker
         worker.check_connected()
 
+        # WILSON: enable wasm remote
+        enable_wasm = task_options.get("wasm", False)
+        if self._language == Language.WASM or (enable_wasm is not None and enable_wasm and enable_wasm != '0'):
+            self._language = Language.WASM # set language to WASM if wasm is enabled
+            self._function_descriptor = WASMFunctionDescriptor.from_function(
+                self._function, self._uuid
+            )
+            try:
+                self._pickled_function = self._function.source if isinstance(self._function, Module) else pickle.dumps(self._function)
+            except Exception as e:
+                msg = (
+                    "Could not serialize the function "
+                    f"{self._function_descriptor.repr}. Check "
+                    "https://docs.ray.io/en/master/ray-core/objects/serialization.html#troubleshooting "  # noqa
+                    "for more information."
+                )
+                raise TypeError(msg) from e
+            
+            self._last_export_session_and_job = worker.current_session_and_job
+            worker.function_actor_manager.export(self)
+            # raise Exception("WASM remote function is not supported yet")
+
         # If this function was not exported in this session and job, we need to
         # export this function again, because the current GCS doesn't have it.
-        if (
+        elif (
             not self._is_cross_language
             and self._last_export_session_and_job != worker.current_session_and_job
         ):
@@ -268,7 +291,7 @@ class RemoteFunction:
             # first driver. This is an argument for repickling the function,
             # which we do here.
             try:
-                self._pickled_function = pickle.dumps(self._function)
+                self._pickled_function = self._function.source if isinstance(self._function, Module) else pickle.dumps(self._function)
             except TypeError as e:
                 msg = (
                     "Could not serialize the function "
@@ -376,7 +399,7 @@ class RemoteFunction:
             elif not args and not kwargs and not self._function_signature:
                 list_args = []
             else:
-                list_args = ray._private.signature.flatten_args(
+                list_args = self._function_signature if self._language == Language.WASM else ray._private.signature.flatten_args(
                     self._function_signature, args, kwargs
                 )
 

@@ -265,6 +265,7 @@ LOG_PREFIX_TASK_NAME = ":task_name:"
 OBJECT_METADATA_TYPE_CROSS_LANGUAGE = b"XLANG"
 # A constant used as object metadata to indicate the object is python specific.
 OBJECT_METADATA_TYPE_PYTHON = b"PYTHON"
+OBJECT_METADATA_TYPE_WASM = b"WASM"
 # A constant used as object metadata to indicate the object is raw bytes.
 OBJECT_METADATA_TYPE_RAW = b"RAW"
 

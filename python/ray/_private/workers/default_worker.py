@@ -10,6 +10,7 @@ import ray._private.node
 import ray._private.ray_constants as ray_constants
 import ray._private.utils
 import ray.actor
+from ray import Language
 from ray._private.parameter import RayParams
 from ray._private.ray_logging import configure_log_file, get_worker_log_file_name
 
@@ -146,7 +147,13 @@ parser.add_argument(
     required=False,
     help="The address of web ui",
 )
-
+# WILSON: option for WASM Python worker support
+parser.add_argument(
+    "--enable-wasm",
+    default=False,
+    required=False,
+    help="Enable WebAssembly support in Python worker.",
+)
 
 if __name__ == "__main__":
     # NOTE(sang): For some reason, if we move the code below
@@ -182,6 +189,7 @@ if __name__ == "__main__":
         gcs_address=args.gcs_address,
         session_name=args.session_name,
         webui=args.webui,
+        enable_wasm=args.enable_wasm,
     )
     node = ray._private.node.Node(
         ray_params,
@@ -216,6 +224,7 @@ if __name__ == "__main__":
         runtime_env_hash=args.runtime_env_hash,
         startup_token=args.startup_token,
         ray_debugger_external=args.ray_debugger_external,
+        language=Language.WASM if args.enable_wasm else Language.PYTHON,
     )
 
     # Add code search path to sys.path, set load_code_from_local.
@@ -244,4 +253,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(100000)
     else:
-        raise ValueError(f"Unexcepted worker mode: {mode}")
+        raise ValueError(f"Unexpected worker mode: {mode}")

@@ -44,6 +44,15 @@ def list_named_actors(all_namespaces: bool = False) -> List[str]:
     else:
         return [name for _, name in actors]
 
+import wasmtime
+import typing
+
+class Module(wasmtime.Module):
+
+    def __init__(self, engine: wasmtime.Engine, wasm: typing.Union[str, bytes]):
+        super().__init__(engine, wasm)
+        self.source = wasm
+
 
 __all__ = [
     "ActorPool",
@@ -65,4 +74,5 @@ __all__ = [
     "register_serializer",
     "deregister_serializer",
     "list_named_actors",
+    "Module",
 ]

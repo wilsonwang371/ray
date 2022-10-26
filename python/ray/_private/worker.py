@@ -1885,6 +1885,7 @@ def connect(
     startup_token: int = 0,
     ray_debugger_external: bool = False,
     entrypoint: str = "",
+    language: Language = Language.PYTHON,
 ):
     """Connect this worker to the raylet, to Plasma, and to GCS.
 
@@ -1906,6 +1907,7 @@ def connect(
             node this worker is running on.
         entrypoint: The name of the entrypoint script. Ignored unless the
             mode != SCRIPT_MODE
+        language: The language of the worker.
     """
     # Do some basic checking to make sure we didn't call ray.init twice.
     error_message = "Perhaps you called ray.init twice by accident?"
@@ -2053,6 +2055,7 @@ def connect(
         startup_token,
         session_name,
         "" if mode != SCRIPT_MODE else entrypoint,
+        True if language == Language.WASM else False,
     )
 
     # Notify raylet that the core worker is ready.
@@ -2858,6 +2861,17 @@ def remote(
 ) -> RemoteDecorator:
     ...
 
+from ray.util import Module
+@PublicAPI
+def wasm_remote(*args) -> Union[ray.remote_function.RemoteFunction, ray.actor.ActorClass]:
+    assert len(args) == 1, "wasm_remote should only be used as a decorator."
+    if not isinstance(args[0], Module):
+        raise TypeError("wasm_remote should only be used on a Wasm module.")
+    return ray.remote_function.RemoteFunction(
+            Language.WASM,
+            args[0],
+            None,
+            {})
 
 @PublicAPI
 def remote(

@@ -180,6 +180,7 @@ class RayParams:
         env_vars: Optional[Dict[str, str]] = None,
         session_name: Optional[str] = None,
         webui: Optional[str] = None,
+        enable_wasm: Optional[bool] = None,
     ):
         self.redis_address = redis_address
         self.gcs_address = gcs_address
@@ -238,6 +239,7 @@ class RayParams:
         self.env_vars = env_vars
         self.session_name = session_name
         self.webui = webui
+        self.enable_wasm = enable_wasm # WILSON: enable wasm support in python worker
         self._system_config = _system_config or {}
         self._enable_object_reconstruction = enable_object_reconstruction
         self._check_usage()

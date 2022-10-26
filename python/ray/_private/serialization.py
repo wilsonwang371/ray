@@ -45,6 +45,9 @@ from ray.exceptions import (
 )
 from ray.util import serialization_addons
 
+from wasmtime import ValType
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -202,9 +205,13 @@ class SerializationContext:
 
     def _deserialize_msgpack_data(self, data, metadata_fields):
         msgpack_data, pickle5_data = split_buffer(data)
+        logger.info("msgpack_data: {}, pickle5_data: {}".format(msgpack_data, pickle5_data))
 
         if metadata_fields[0] == ray_constants.OBJECT_METADATA_TYPE_PYTHON:
             python_objects = self._deserialize_pickle5_data(pickle5_data)
+        elif metadata_fields[0] == ray_constants.OBJECT_METADATA_TYPE_WASM:
+            python_objects = self._deserialize_pickle5_data(pickle5_data)
+            logger.info("python_objects: {}".format(python_objects))
         else:
             python_objects = []
 
@@ -243,11 +250,13 @@ class SerializationContext:
             )
 
     def _deserialize_object(self, data, metadata, object_ref):
+        logger.info("_deserialize_object: {} {} {}".format(data, metadata, object_ref))
         if metadata:
             metadata_fields = metadata.split(b",")
             if metadata_fields[0] in [
                 ray_constants.OBJECT_METADATA_TYPE_CROSS_LANGUAGE,
                 ray_constants.OBJECT_METADATA_TYPE_PYTHON,
+                ray_constants.OBJECT_METADATA_TYPE_WASM,
             ]:
                 return self._deserialize_msgpack_data(data, metadata_fields)
             # Check if the object should be returned as raw bytes.
@@ -362,6 +371,7 @@ class SerializationContext:
             self._thread_local.object_ref_stack = []
         results = []
         for object_ref, (data, metadata) in zip(object_refs, data_metadata_pairs):
+            logger.info("object_ref, data, metadata: %s, %s, %s"% (object_ref, data, metadata))
             try:
                 # Push the object ref to the stack, so the object under
                 # the object ref knows where it comes from.
@@ -375,6 +385,7 @@ class SerializationContext:
                 if self._thread_local.object_ref_stack:
                     self._thread_local.object_ref_stack.pop()
             results.append(obj)
+        logger.info("results: %s"% results)
         return results
 
     def _serialize_to_pickle5(self, metadata, value):
@@ -421,13 +432,19 @@ class SerializationContext:
             python_objects.append(o)
             return index
 
+        logger.info("_serialize_to_msgpack value: %s"% value)
         msgpack_data = MessagePackSerializer.dumps(value, _python_serializer)
 
         if python_objects:
-            metadata = ray_constants.OBJECT_METADATA_TYPE_PYTHON
-            pickle5_serialized_object = self._serialize_to_pickle5(
-                metadata, python_objects
-            )
+            if isinstance(value, ValType):
+                metadata = ray_constants.OBJECT_METADATA_TYPE_WASM
+                pickle5_serialized_object = self._serialize_to_pickle5(
+                    metadata, str(value))
+            else:
+                metadata = ray_constants.OBJECT_METADATA_TYPE_PYTHON
+                pickle5_serialized_object = self._serialize_to_pickle5(
+                    metadata, python_objects
+                )
         else:
             pickle5_serialized_object = None
 
@@ -447,4 +464,5 @@ class SerializationContext:
             # that this object can also be read by Java.
             return RawSerializedObject(value)
         else:
+            logger.info("serialize() value: %s"% value)
             return self._serialize_to_msgpack(value)

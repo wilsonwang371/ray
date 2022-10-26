@@ -26,6 +26,7 @@ enum Language {
   PYTHON = 0;
   JAVA = 1;
   CPP = 2;
+  WASM = 3;
 }
 
 // Type of a worker.
@@ -105,6 +106,14 @@ message PythonFunctionDescriptor {
   string function_hash = 4;
 }
 
+/// Function descriptor for WASM.
+message WASMFunctionDescriptor {
+  string module_name = 1;
+  string class_name = 2;
+  string function_name = 3;
+  string function_hash = 4;
+}
+
 /// Function descriptor for C/C++.
 message CppFunctionDescriptor {
   /// Remote function name.
@@ -119,6 +128,7 @@ message FunctionDescriptor {
     JavaFunctionDescriptor java_function_descriptor = 1;
     PythonFunctionDescriptor python_function_descriptor = 2;
     CppFunctionDescriptor cpp_function_descriptor = 3;
+    WASMFunctionDescriptor wasm_function_descriptor = 4;
   }
 }
 

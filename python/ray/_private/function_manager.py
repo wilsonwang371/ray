@@ -11,6 +11,8 @@ import time
 import traceback
 from collections import defaultdict, namedtuple
 from typing import Optional
+from wasmtime import Store
+from ray.util import Module
 
 import ray
 import ray._private.profiling as profiling
@@ -36,6 +38,7 @@ FunctionExecutionInfo = namedtuple(
 
 logger = logging.getLogger(__name__)
 
+store = Store()
 
 def make_function_table_key(key_type: bytes, job_id: JobID, key: Optional[bytes]):
     if key is None:
@@ -125,6 +128,10 @@ class FunctionActorManager:
                 behavior won't change.
         """
         import io
+
+        if isinstance(function_or_class, Module):
+            collision_identifier = function_or_class.exports[0].name + ":" + function_or_class.source
+            return hashlib.sha1(collision_identifier.encode("utf-8")).digest()
 
         string_file = io.StringIO()
         if sys.version_info[1] >= 7:
@@ -262,7 +269,17 @@ class FunctionActorManager:
             self._num_task_executions[function_id] = 0
 
             try:
-                function = pickle.loads(serialized_function)
+                # logger.info("serialized function: %s", serialized_function)
+                try:
+                    function = pickle.loads(serialized_function)
+                except Exception as e:
+                    try:
+                        logger.info("serialized function: %s", serialized_function)
+                        function = Module(store.engine, serialized_function)
+                        function.store = store
+                    except:
+                        raise e
+
             except Exception:
 
                 # If an exception was thrown when the remote function was
@@ -299,6 +316,7 @@ class FunctionActorManager:
                 # script was started from, its module is `__main__`.
                 # However in the worker process, the `__main__` module is a
                 # different module, which is `default_worker.py`
+                logger.info("function name: %s", function_name)
                 function.__module__ = module
                 self._function_execution_info[function_id] = FunctionExecutionInfo(
                     function=function, function_name=function_name, max_calls=max_calls

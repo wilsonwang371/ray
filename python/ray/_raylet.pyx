@@ -76,6 +76,7 @@ from ray.includes.common cimport (
     LANGUAGE_CPP,
     LANGUAGE_JAVA,
     LANGUAGE_PYTHON,
+    LANGUAGE_WASM,
     LocalMemoryBuffer,
     TASK_TYPE_NORMAL_TASK,
     TASK_TYPE_ACTOR_CREATION_TASK,
@@ -140,6 +141,9 @@ import ray._private.gcs_utils as gcs_utils
 import ray._private.memory_monitor as memory_monitor
 import ray._private.profiling as profiling
 from ray._private.utils import decode, DeferSigint
+
+from wasmtime import Store, Instance, Func, FuncType
+from ray.util import Module
 
 cimport cpython
 
@@ -331,6 +335,8 @@ cdef class Language:
             return "CPP"
         elif <int32_t>self.lang == <int32_t>LANGUAGE_JAVA:
             return "JAVA"
+        elif <int32_t>self.lang == <int32_t>LANGUAGE_WASM:
+            return "WASM"
         else:
             raise Exception("Unexpected error")
 
@@ -340,6 +346,7 @@ cdef class Language:
     PYTHON = Language.from_native(LANGUAGE_PYTHON)
     CPP = Language.from_native(LANGUAGE_CPP)
     JAVA = Language.from_native(LANGUAGE_JAVA)
+    WASM = Language.from_native(LANGUAGE_WASM)
 
 
 cdef int prepare_resources(
@@ -451,13 +458,13 @@ cdef prepare_args_internal(
             except TypeError as e:
                 msg = (
                     "Could not serialize the argument "
-                    f"{repr(arg)} for a task or actor "
-                    f"{function_descriptor.repr}. Check "
+                    f"{str(arg)} for a task or actor "
+                    f"{function_descriptor}. Check "
                     "https://docs.ray.io/en/master/ray-core/objects/serialization.html#troubleshooting " # noqa
                     "for more information.")
                 raise TypeError(msg) from e
             metadata = serialized_arg.metadata
-            if language != Language.PYTHON:
+            if language != Language.PYTHON and language != Language.WASM:
                 metadata_fields = metadata.split(b",")
                 if metadata_fields[0] not in [
                         ray_constants.OBJECT_METADATA_TYPE_CROSS_LANGUAGE,
@@ -742,6 +749,18 @@ cdef void execute_task(
     if <int>task_type == <int>TASK_TYPE_NORMAL_TASK:
         next_title = "ray::IDLE"
         function_executor = execution_info.function
+        if isinstance(function_executor, Module):
+            store = function_executor.store
+            def say_hello():
+                print("Hello Ray!")
+            hello = Func(store, FuncType([], []), say_hello)
+            instance = Instance(store, function_executor, [hello])
+            logger.info("Instantiated module: {}".format(function_name))
+            func = instance.exports(store)[function_name]
+            def wrapper(*args, **kwargs):
+                func(store, *args, **kwargs)
+            function_executor = wrapper
+
         # Record the task name via :task_name: magic token in the log file.
         # This is used for the prefix in driver logs `(task_name pid=123) ...`
         task_name_magic_token = "{}{}\n".format(
@@ -786,7 +805,6 @@ cdef void execute_task(
                     async_function, function_descriptor,
                     name_of_concurrency_group_to_execute, actor,
                     *arguments, **kwarguments)
-
             return function(actor, *arguments, **kwarguments)
 
     with core_worker.profile_event(b"task::" + name, extra_data=extra_data):
@@ -807,6 +825,8 @@ cdef void execute_task(
                     if core_worker.current_actor_is_asyncio():
                         # We deserialize objects in event loop thread to
                         # prevent segfaults. See #7799
+                        logger.info("A metadata_pairs: {}".format(metadata_pairs))
+                        logger.info("A object_refs: {}".format(object_refs))
                         async def deserialize_args():
                             return (ray._private.worker.global_worker
                                     .deserialize_objects(
@@ -824,6 +844,8 @@ cdef void execute_task(
                         # See https://github.com/ray-project/ray/issues/30453.
                         # NOTE (Clark): Signal handlers can only be registered on the
                         # main thread.
+                        logger.info("B metadata_pairs: {}".format(metadata_pairs))
+                        logger.info("B object_refs: {}".format(object_refs))
                         with DeferSigint.create_if_main_thread():
                             args = (ray._private.worker.global_worker
                                     .deserialize_objects(
@@ -831,6 +853,7 @@ cdef void execute_task(
 
                     for arg in args:
                         raise_if_dependency_failed(arg)
+                    logger.info("Deserialized arguments: {}".format(args))
                     args, kwargs = ray._private.signature.recover_args(args)
 
             if (<int>task_type == <int>TASK_TYPE_ACTOR_CREATION_TASK):
@@ -850,6 +873,8 @@ cdef void execute_task(
                         if debugger_breakpoint != b"":
                             ray.util.pdb.set_trace(
                                 breakpoint_uuid=debugger_breakpoint)
+                        logger.info("Executing task {} {}.".format(args, kwargs))
+                        # WILSON: temporarily hack
                         outputs = function_executor(*args, **kwargs)
                         next_breakpoint = (
                             ray._private.worker.global_worker.debugger_breakpoint)
@@ -1445,7 +1470,7 @@ cdef class CoreWorker:
                   node_ip_address, node_manager_port, raylet_ip_address,
                   local_mode, driver_name, stdout_file, stderr_file,
                   serialized_job_config, metrics_agent_port, runtime_env_hash,
-                  startup_token, session_name, entrypoint):
+                  startup_token, session_name, entrypoint, enable_wasm):
         self.is_local_mode = local_mode
 
         cdef CCoreWorkerOptions options = CCoreWorkerOptions()
@@ -1463,7 +1488,7 @@ cdef class CoreWorker:
             options.worker_type = WORKER_TYPE_RESTORE_WORKER
         else:
             raise ValueError(f"Unknown worker type: {worker_type}")
-        options.language = LANGUAGE_PYTHON
+        options.language = LANGUAGE_WASM if enable_wasm else LANGUAGE_PYTHON
         options.store_socket = store_socket.encode("ascii")
         options.raylet_socket = raylet_socket.encode("ascii")
         options.job_id = job_id.native()

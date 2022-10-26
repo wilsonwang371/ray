@@ -298,7 +298,7 @@ WorkerPool::BuildProcessCommandArgs(const Language &language,
     worker_command_args.push_back(token);
   }
 
-  if (language == Language::PYTHON) {
+  if (language == Language::PYTHON || language == Language::WASM) {
     RAY_CHECK(worker_type == rpc::WorkerType::WORKER || IsIOWorkerType(worker_type));
     if (IsIOWorkerType(worker_type)) {
       // Without "--worker-type", by default the worker type is rpc::WorkerType::WORKER.
@@ -315,7 +315,7 @@ WorkerPool::BuildProcessCommandArgs(const Language &language,
         absl::Base64Escape(RayConfig::instance().object_spilling_config()));
   }
 
-  if (language == Language::PYTHON) {
+  if (language == Language::PYTHON || language == Language::WASM) {
     worker_command_args.push_back("--startup-token=" +
                                   std::to_string(worker_startup_token_counter_));
   } else if (language == Language::CPP) {
@@ -334,7 +334,7 @@ WorkerPool::BuildProcessCommandArgs(const Language &language,
     }
     worker_command_args.push_back("--serialized-runtime-env-context=" +
                                   serialized_runtime_env_context);
-  } else if (language == Language::PYTHON && worker_command_args.size() >= 2 &&
+  } else if ((language == Language::PYTHON || language == Language::WASM) && worker_command_args.size() >= 2 &&
              worker_command_args[1].find(kSetupWorkerFilename) != std::string::npos) {
     // Check that the arg really is the path to the setup worker before erasing it, to
     // prevent breaking tests that mock out the worker command args.
@@ -387,7 +387,7 @@ WorkerPool::BuildProcessCommandArgs(const Language &language,
   // causing the process's /proc/PID/environ being empty.
   // Add `SPT_NOENV` env to prevent setproctitle breaking /proc/PID/environ.
   // Refer this issue for more details: https://github.com/ray-project/ray/issues/15061
-  if (language == Language::PYTHON) {
+  if (language == Language::PYTHON || language == Language::WASM) {
     env.insert({"SPT_NOENV", "1"});
   }
 
@@ -460,6 +460,9 @@ std::tuple<Process, StartupToken> WorkerPool::StartWorkerProcess(
                               runtime_env_hash,
                               serialized_runtime_env_context,
                               state);
+  // WILSON: print worker command args
+  RAY_LOG(INFO) << "Starting worker process with command " << worker_command_args[0]
+                 << " and args " << absl::StrJoin(worker_command_args, " ");
 
   // Start a process and measure the startup time.
   auto start = std::chrono::high_resolution_clock::now();

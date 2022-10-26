@@ -46,6 +46,21 @@ FunctionDescriptor FunctionDescriptorBuilder::BuildPython(
   return ray::FunctionDescriptor(new PythonFunctionDescriptor(std::move(descriptor)));
 }
 
+// WILSON: BuildWASM
+FunctionDescriptor FunctionDescriptorBuilder::BuildWASM(
+    const std::string &module_name,
+    const std::string &class_name,
+    const std::string &function_name,
+    const std::string &function_hash) {
+  rpc::FunctionDescriptor descriptor;
+  auto typed_descriptor = descriptor.mutable_wasm_function_descriptor();
+  typed_descriptor->set_module_name(module_name);
+  typed_descriptor->set_class_name(class_name);
+  typed_descriptor->set_function_name(function_name);
+  typed_descriptor->set_function_hash(function_hash);
+  return ray::FunctionDescriptor(new WASMFunctionDescriptor(std::move(descriptor)));
+}
+
 FunctionDescriptor FunctionDescriptorBuilder::BuildCpp(const std::string &function_name,
                                                        const std::string &caller,
                                                        const std::string &class_name) {
@@ -65,6 +80,8 @@ FunctionDescriptor FunctionDescriptorBuilder::FromProto(rpc::FunctionDescriptor 
     return ray::FunctionDescriptor(new ray::PythonFunctionDescriptor(std::move(message)));
   case ray::FunctionDescriptorType::kCppFunctionDescriptor:
     return ray::FunctionDescriptor(new ray::CppFunctionDescriptor(std::move(message)));
+  case ray::FunctionDescriptorType::kWasmFunctionDescriptor:
+    return ray::FunctionDescriptor(new ray::WASMFunctionDescriptor(std::move(message)));
   default:
     break;
   }
@@ -96,6 +113,14 @@ FunctionDescriptor FunctionDescriptorBuilder::FromVector(
         function_descriptor_list[0],   // function name
         function_descriptor_list[1],   // caller
         function_descriptor_list[2]);  // class name
+  } else if (language == rpc::Language::WASM) {
+    RAY_CHECK(function_descriptor_list.size() == 4);
+    return FunctionDescriptorBuilder::BuildWASM(
+        function_descriptor_list[0],  // module name
+        function_descriptor_list[1],  // class name
+        function_descriptor_list[2],  // function name
+        function_descriptor_list[3]   // function hash
+    );
   } else {
     RAY_LOG(FATAL) << "Unspported language " << language;
     return FunctionDescriptorBuilder::Empty();

@@ -61,6 +61,12 @@ class RuntimeEnvContext:
 
             class_path_args = ["-cp", ray_jars + ":" + str(":".join(local_java_jars))]
             passthrough_args = class_path_args + passthrough_args
+        elif language == Language.WASM:
+            # TODO(wilsonwang371): fix this
+            if sys.platform == "win32":
+                raise NotImplementedError(
+                    "WASM runtime env is not supported on Windows.")
+            executable = f"exec {self.py_executable}"
         elif sys.platform == "win32":
             executable = ""
         else:

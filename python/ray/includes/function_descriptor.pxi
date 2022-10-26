@@ -4,10 +4,12 @@ from ray.includes.function_descriptor cimport (
     CPythonFunctionDescriptor,
     CJavaFunctionDescriptor,
     CCppFunctionDescriptor,
+    CWASMFunctionDescriptor,
     EmptyFunctionDescriptorType,
     JavaFunctionDescriptorType,
     PythonFunctionDescriptorType,
     CppFunctionDescriptorType,
+    WASMFunctionDescriptorType,
 )
 
 import hashlib
@@ -15,7 +17,7 @@ import cython
 import inspect
 import uuid
 import ray._private.ray_constants as ray_constants
-
+from ray.util import Module
 
 ctypedef object (*FunctionDescriptor_from_cpp)(const CFunctionDescriptor &)
 cdef unordered_map[int, FunctionDescriptor_from_cpp] \
@@ -312,6 +314,123 @@ cdef class PythonFunctionDescriptor(FunctionDescriptor):
             except (TypeError, OSError):
                 pass
         return module_name
+
+    def is_actor_method(self):
+        """Wether this function descriptor is an actor method.
+
+        Returns:
+            True if it's an actor method, False if it's a normal function.
+        """
+        return not self.typed_descriptor.ClassName().empty()
+
+
+FunctionDescriptor_constructor_map[<int>WASMFunctionDescriptorType] = \
+    WASMFunctionDescriptor.from_cpp
+
+@cython.auto_pickle(False)
+cdef class WASMFunctionDescriptor(FunctionDescriptor):
+    cdef:
+        CWASMFunctionDescriptor *typed_descriptor
+        object _function_id
+
+    def __cinit__(self,
+                  module_name,
+                  function_name,
+                  class_name="",
+                  function_source_hash=""):
+        self.descriptor = CFunctionDescriptorBuilder.BuildWASM(
+            module_name, class_name, function_name, function_source_hash)
+        self.typed_descriptor = <CWASMFunctionDescriptor*>(
+            self.descriptor.get())
+
+    def __reduce__(self):
+        return WASMFunctionDescriptor, (self.typed_descriptor.ModuleName(),
+                                          self.typed_descriptor.FunctionName(),
+                                          self.typed_descriptor.ClassName(),
+                                          self.typed_descriptor.FunctionHash())
+    
+    @staticmethod
+    cdef from_cpp(const CFunctionDescriptor &c_function_descriptor):
+        cdef CWASMFunctionDescriptor *typed_descriptor = \
+            <CWASMFunctionDescriptor*>(c_function_descriptor.get())
+        return WASMFunctionDescriptor(typed_descriptor.ModuleName(),
+                                        typed_descriptor.FunctionName(),
+                                        typed_descriptor.ClassName(),
+                                        typed_descriptor.FunctionHash())
+
+    @classmethod
+    def from_function(cls, function, function_uuid):
+        module_name = cls._get_module_name(function)
+        function_name = function.exports[0].name if isinstance(function, Module) else function.__qualname__
+        class_name = ""
+
+        return cls(module_name, function_name, class_name, function_uuid.hex)
+
+    @property
+    def module_name(self):
+        """Get the module name of current function descriptor.
+
+        Returns:
+            The module name of the function descriptor.
+        """
+        return <str>self.typed_descriptor.ModuleName()
+    
+    @property
+    def class_name(self):
+        return <str>self.typed_descriptor.ClassName()
+        
+    @property
+    def function_name(self):
+        """Get the function name of current function descriptor.
+
+        Returns:
+            The function name of the function descriptor.
+        """
+        return <str>self.typed_descriptor.FunctionName()
+
+    @property
+    def function_hash(self):
+        """Get the hash string of the function source code.
+
+        Returns:
+            The hex of function hash if the source code is available.
+                Otherwise, it will be an empty string.
+        """
+        return <str>self.typed_descriptor.FunctionHash()
+
+    @property
+    def function_id(self):
+        """Get the function id calculated from this descriptor.
+
+        Returns:
+            The value of ray.ObjectRef that represents the function id.
+        """
+        if not self._function_id:
+            self._function_id = self._get_function_id()
+        return self._function_id
+
+    def _get_function_id(self):
+        """Calculate the function id of current function descriptor.
+
+        This function id is calculated from all the fields of function
+        descriptor.
+
+        Returns:
+            ray.ObjectRef to represent the function descriptor.
+        """
+        function_id_hash = hashlib.shake_128()
+        # Include the function module and name in the hash.
+        function_id_hash.update(self.typed_descriptor.ModuleName())
+        function_id_hash.update(self.typed_descriptor.FunctionName())
+        function_id_hash.update(self.typed_descriptor.FunctionHash())
+        # Compute the function ID.
+        function_id = function_id_hash.digest(ray_constants.ID_SIZE)
+        return ray.FunctionID(function_id)
+
+    @staticmethod
+    def _get_module_name(object):
+        """"""
+        return object.__module__
 
     def is_actor_method(self):
         """Wether this function descriptor is an actor method.

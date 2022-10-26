@@ -55,6 +55,9 @@ GCS_SERVER_EXECUTABLE = os.path.join(
 # Location of the cpp default worker executables.
 DEFAULT_WORKER_EXECUTABLE = os.path.join(RAY_PATH, "cpp", "default_worker" + EXE_SUFFIX)
 
+# Location of the wasm default worker executables.
+DEFAULT_WASM_WORKER_EXECUTABLE = os.path.join(RAY_PATH, "wasm/default_wasm_worker" + EXE_SUFFIX)
+
 # Location of the native libraries.
 DEFAULT_NATIVE_LIBRARY_PATH = os.path.join(RAY_PATH, "cpp", "lib")
 
@@ -861,6 +864,8 @@ def start_ray_process(
                 f"got {total_chrs}"
             )
 
+    # WILSON: print process launching details.
+    print("Launch Process: " + " ".join(["'{}'".format(arg) for arg in command]))
     process = ConsolePopen(
         command,
         env=modified_env,
@@ -1456,6 +1461,11 @@ def start_raylet(
 
     if redis_password:
         start_worker_command += [f"--redis-password={redis_password}"]
+    
+    # WILSON: support wasm worker command
+    wasm_worker_command = [i for i in start_worker_command] + [
+        "--enable-wasm=true",
+    ]
 
     # If the object manager port is None, then use 0 to cause the object
     # manager to choose its own port.
@@ -1519,6 +1529,7 @@ def start_raylet(
         f"--python_worker_command={subprocess.list2cmdline(start_worker_command)}",  # noqa
         f"--java_worker_command={subprocess.list2cmdline(java_worker_command)}",  # noqa
         f"--cpp_worker_command={subprocess.list2cmdline(cpp_worker_command)}",  # noqa
+        f"--wasm_worker_command={subprocess.list2cmdline(wasm_worker_command)}",  # noqa
         f"--native_library_path={DEFAULT_NATIVE_LIBRARY_PATH}",
         f"--temp_dir={temp_dir}",
         f"--session_dir={session_dir}",

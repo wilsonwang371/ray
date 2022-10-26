@@ -4,6 +4,9 @@ from inspect import Parameter
 
 from ray._private.inspect_util import is_cython
 
+from ray.util import Module
+
+
 # Logger for this module. It should be configured at the entry point
 # into the program using Ray. Ray provides a default configuration at
 # entry/init points.
@@ -65,6 +68,8 @@ def extract_signature(func, ignore_first=False):
     Returns:
         List of Parameter objects representing the function signature.
     """
+    if isinstance(func, Module):
+        return func.exports[0].type.params
     signature_parameters = list(get_signature(func).parameters.values())
 
     if ignore_first:

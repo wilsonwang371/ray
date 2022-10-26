@@ -271,6 +271,56 @@ class CppFunctionDescriptor : public FunctionDescriptorInterface {
   const rpc::CppFunctionDescriptor *typed_message_;
 };
 
+class WASMFunctionDescriptor : public FunctionDescriptorInterface {
+ public:
+  /// Construct from a protobuf message object.
+  /// The input message will be **copied** into this object.
+  ///
+  /// \param message The protobuf message.
+  explicit WASMFunctionDescriptor(rpc::FunctionDescriptor message)
+      : FunctionDescriptorInterface(std::move(message)) {
+    RAY_CHECK(message_->function_descriptor_case() ==
+              ray::FunctionDescriptorType::kWasmFunctionDescriptor);
+    typed_message_ = &(message_->wasm_function_descriptor());
+  }
+
+  virtual size_t Hash() const {
+    return std::hash<int>()(ray::FunctionDescriptorType::kWasmFunctionDescriptor) ^
+           std::hash<std::string>()(typed_message_->function_name());
+  }
+
+  inline bool operator==(const WASMFunctionDescriptor &other) const {
+    if (this == &other) {
+      return true;
+    }
+    return this->FunctionName() == other.FunctionName();
+  }
+
+  inline bool operator!=(const WASMFunctionDescriptor &other) const {
+    return !(*this == other);
+  }
+
+  virtual std::string ToString() const {
+    return "{type=WASMFunctionDescriptor, function_name=" +
+           typed_message_->function_name() + "}";
+  }
+
+  virtual std::string CallString() const { return typed_message_->function_name(); }
+
+  virtual std::string DefaultTaskName() const { return CallString(); }
+
+  virtual std::string ClassName() const { return typed_message_->class_name(); }
+
+  const std::string &ModuleName() const { return typed_message_->module_name(); }
+
+  const std::string &FunctionName() const { return typed_message_->function_name(); }
+
+  const std::string &FunctionHash() const { return typed_message_->function_hash(); }
+
+ private:
+  const rpc::WASMFunctionDescriptor *typed_message_;
+};
+
 typedef std::shared_ptr<FunctionDescriptorInterface> FunctionDescriptor;
 
 inline bool operator==(const FunctionDescriptor &left, const FunctionDescriptor &right) {
@@ -296,6 +346,9 @@ inline bool operator==(const FunctionDescriptor &left, const FunctionDescriptor 
   case ray::FunctionDescriptorType::kCppFunctionDescriptor:
     return static_cast<const CppFunctionDescriptor &>(*left) ==
            static_cast<const CppFunctionDescriptor &>(*right);
+  case ray::FunctionDescriptorType::kWasmFunctionDescriptor:
+    return static_cast<const WASMFunctionDescriptor &>(*left) ==
+           static_cast<const WASMFunctionDescriptor &>(*right);
   default:
     RAY_LOG(FATAL) << "Unknown function descriptor type: " << left->Type();
     return false;
@@ -325,6 +378,14 @@ class FunctionDescriptorBuilder {
   ///
   /// \return a ray::PythonFunctionDescriptor
   static FunctionDescriptor BuildPython(const std::string &module_name,
+                                        const std::string &class_name,
+                                        const std::string &function_name,
+                                        const std::string &function_hash);
+  
+  /// Build a WASMFunctionDescriptor.
+  ///
+  /// \return a ray::WASMFunctionDescriptor
+  static FunctionDescriptor BuildWASM(const std::string &module_name,
                                         const std::string &class_name,
                                         const std::string &function_name,
                                         const std::string &function_hash);

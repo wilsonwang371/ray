@@ -148,6 +148,7 @@ from ray._private.worker import (  # noqa: E402,F401
     put,
     kill,
     remote,
+    wasm_remote,
     shutdown,
     wait,
 )
