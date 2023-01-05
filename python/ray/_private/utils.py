@@ -88,13 +88,14 @@ def get_ray_temp_dir():
     return os.path.join(get_user_temp_dir(), "ray")
 
 
-def get_ray_cpp_worker_path(default_worker_path):
-    """Return the path to the ray cpp executable."""
-    if not os.path.exists(default_worker_path):
-        default_worker_path = None
+def get_ray_worker_path(language: str, worker_name: str, default_worker_path: str):
+    """Return the path to the ray executable."""
+    if default_worker_path and not os.path.exists(default_worker_path):
+        default_worker_path = ""
     for i in pkg_resources.working_set:
-        if i.key == "ray-cpp":
-            default_worker_path = os.path.join(i.location, "ray/cpp/default_worker")
+        if i.key == "ray-{}".format(language):
+            default_worker_path = os.path.join(i.location,
+                "ray/{}/{}".format(language, worker_name))
     return default_worker_path
 
 

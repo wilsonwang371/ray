@@ -7,6 +7,7 @@
 /python/ray/pyarrow_files/
 /python/ray/jars/
 /python/ray/cpp/
+/python/ray/wasm/
 /python/build
 /python/dist
 /python/python-driver-*
@@ -27,6 +28,11 @@
 /cpp/example/thirdparty/
 /cpp/example/bazel-*
 /python/ray/cpp
+
+# Files genrated by wasm worker should be ignored.
+/wasm/example/thirdparty/
+/wasm/example/bazel-*
+/python/ray/wasm
 
 # Redis temporary files
 *dump.rdb
@@ -170,6 +176,9 @@ dependency-reduced-pom.xml
 # Cpp
 cpp/example/thirdparty/
 
+# Wasm
+wasm/example/thirdparty/
+
 .clwb
 
 # pom.xml files generated from pom_template.xml
@@ -224,3 +233,4 @@ workflow_data/
 /compile_commands.json
 # Directory where clangd puts its indexing work
 /.cache/
+python/ray/wasm/wasm_worker

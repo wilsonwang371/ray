@@ -28,6 +28,8 @@ cdef extern from "src/ray/protobuf/common.pb.h" nogil:
         "ray::FunctionDescriptorType::kPythonFunctionDescriptor"
     cdef CFunctionDescriptorType CppFunctionDescriptorType \
         "ray::FunctionDescriptorType::kCppFunctionDescriptor"
+    cdef CFunctionDescriptorType WasmFunctionDescriptorType \
+        "ray::FunctionDescriptorType::kWasmFunctionDescriptor"
 
 
 cdef extern from "ray/common/function_descriptor.h" nogil:
@@ -59,6 +61,11 @@ cdef extern from "ray/common/function_descriptor.h" nogil:
         CFunctionDescriptor BuildCpp(const c_string &function_name,
                                      const c_string &caller,
                                      const c_string &class_name)
+        
+        @staticmethod
+        CFunctionDescriptor BuildWasm(const c_string &function_name,
+                                      const c_string &caller,
+                                      const c_string &class_name)
 
         @staticmethod
         CFunctionDescriptor Deserialize(const c_string &serialized_binary)
@@ -78,3 +85,8 @@ cdef extern from "ray/common/function_descriptor.h" nogil:
         c_string FunctionName()
         c_string Caller()
         c_string ClassName()
+
+    cdef cppclass CWasmFunctionDescriptor "ray::WasmFunctionDescriptor":
+        c_string FunctionName()
+        c_string ModuleName()
+        c_string FunctionHash()

@@ -57,6 +57,17 @@ FunctionDescriptor FunctionDescriptorBuilder::BuildCpp(const std::string &functi
   return ray::FunctionDescriptor(new CppFunctionDescriptor(std::move(descriptor)));
 }
 
+FunctionDescriptor FunctionDescriptorBuilder::BuildWasm(const std::string &function_name,
+                                                        const std::string &caller,
+                                                        const std::string &class_name) {
+  rpc::FunctionDescriptor descriptor;
+  auto typed_descriptor = descriptor.mutable_cpp_function_descriptor();
+  typed_descriptor->set_function_name(function_name);
+  typed_descriptor->set_caller(caller);
+  typed_descriptor->set_class_name(class_name);
+  return ray::FunctionDescriptor(new WasmFunctionDescriptor(std::move(descriptor)));
+}
+
 FunctionDescriptor FunctionDescriptorBuilder::FromProto(rpc::FunctionDescriptor message) {
   switch (message.function_descriptor_case()) {
   case ray::FunctionDescriptorType::kJavaFunctionDescriptor:
@@ -65,6 +76,8 @@ FunctionDescriptor FunctionDescriptorBuilder::FromProto(rpc::FunctionDescriptor 
     return ray::FunctionDescriptor(new ray::PythonFunctionDescriptor(std::move(message)));
   case ray::FunctionDescriptorType::kCppFunctionDescriptor:
     return ray::FunctionDescriptor(new ray::CppFunctionDescriptor(std::move(message)));
+  case ray::FunctionDescriptorType::kWasmFunctionDescriptor:
+    return ray::FunctionDescriptor(new ray::WasmFunctionDescriptor(std::move(message)));
   default:
     break;
   }
@@ -93,6 +106,12 @@ FunctionDescriptor FunctionDescriptorBuilder::FromVector(
   } else if (language == rpc::Language::CPP) {
     RAY_CHECK(function_descriptor_list.size() == 3);
     return FunctionDescriptorBuilder::BuildCpp(
+        function_descriptor_list[0],   // function name
+        function_descriptor_list[1],   // caller
+        function_descriptor_list[2]);  // class name
+  } else if (language == rpc::Language::WASM) {
+     RAY_CHECK(function_descriptor_list.size() == 3);
+    return FunctionDescriptorBuilder::BuildWasm(
         function_descriptor_list[0],   // function name
         function_descriptor_list[1],   // caller
         function_descriptor_list[2]);  // class name

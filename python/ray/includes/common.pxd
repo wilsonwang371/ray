@@ -192,6 +192,7 @@ cdef extern from "src/ray/protobuf/common.pb.h" nogil:
 cdef extern from "src/ray/protobuf/common.pb.h" nogil:
     cdef CLanguage LANGUAGE_PYTHON "Language::PYTHON"
     cdef CLanguage LANGUAGE_CPP "Language::CPP"
+    cdef CLanguage LANGUAGE_WASM "Language::WASM"
     cdef CLanguage LANGUAGE_JAVA "Language::JAVA"
 
 cdef extern from "src/ray/protobuf/common.pb.h" nogil:
