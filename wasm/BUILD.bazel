@@ -3,7 +3,7 @@
 load("//bazel:ray.bzl", "COPTS")
 
 cc_binary(
-    name = "library_wasm_api.so",
+    name = "libray_wasm_api.so",
     copts = COPTS,
     linkopts = select({
         "@bazel_tools//src/conditions:darwin": [
@@ -20,14 +20,14 @@ cc_binary(
     linkstatic = 1,
     visibility = ["//visibility:public"],
     deps = [
-        ":ray_api",
+        ":ray_wasm_api",
         ":symbols/ray_api_exported_symbols_linux.lds",
         ":symbols/ray_api_exported_symbols_mac.lds",
     ],
 )
 
 cc_library(
-    name = "ray_api",
+    name = "ray_wasm_api",
     srcs = glob([
         "src/ray/api.cc",
         "src/ray/api/*.cc",
@@ -73,7 +73,7 @@ cc_library(
 cc_library(
     name = "ray_wasm_lib",
     srcs = [
-        "library_wasm_api.so",
+        "libray_wasm_api.so",
     ],
     hdrs = glob([
         "include/ray/*.h",
@@ -92,7 +92,7 @@ cc_binary(
     deps = select({
         "@bazel_tools//src/conditions:windows": [
             # TODO: Add Windows support.
-            "//wasm:ray_api",
+            "//wasm:ray_wasm_api",
         ],
         "//conditions:default": [
             # TODO: Add Linux support.
@@ -110,11 +110,10 @@ genrule(
     name = "ray_wasm_pkg",
     srcs = [
         "wasm_worker",
-        "library_wasm_api.so",
+        "ray_wasm_api",
+        "libray_wasm_api.so",
     ],
-    outs = [
-        "ray_wasm_pkg.out",
-    ],
+    outs = ["ray_wasm_pkg.out"],
     cmd = """
         WORK_DIR="$$(pwd)" &&
         PY_WASM_DIR="$$WORK_DIR/python/ray/wasm" &&
@@ -151,7 +150,7 @@ genrule(
         cp -f -r "$$WORK_DIR/external/boost/boost/type_traits" "$$BOOST_DIR" &&
         cp -f -r "$$WORK_DIR/external/boost/boost/utility" "$$BOOST_DIR" &&
         cp -f -r $$WORK_DIR/external/boost/boost/*.hpp "$$BOOST_DIR" &&
-        cp -f $(locations library_wasm_api.so) "$$PY_WASM_DIR/lib/" &&
+        cp -f $(locations libray_wasm_api.so) "$$PY_WASM_DIR/lib/" &&
         cp -f -r "$$WORK_DIR/wasm/include/ray" "$$PY_WASM_DIR/include" &&
         THIRDPARTY_DIR="$$WORK_DIR/wasm/example/thirdparty" &&
         rm -rf $$THIRDPARTY_DIR &&

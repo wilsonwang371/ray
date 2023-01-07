@@ -27,7 +27,7 @@ cc_binary(
 cc_library(
     name = "ray_api",
     srcs = [
-        "thirdparty/lib/library_wasm_api.so",
+        "thirdparty/lib/libray_wasm_api.so",
     ],
     hdrs = glob([
         "thirdparty/include/**/*.h",

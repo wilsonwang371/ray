@@ -61,7 +61,7 @@ FunctionDescriptor FunctionDescriptorBuilder::BuildWasm(const std::string &funct
                                                         const std::string &caller,
                                                         const std::string &class_name) {
   rpc::FunctionDescriptor descriptor;
-  auto typed_descriptor = descriptor.mutable_cpp_function_descriptor();
+  auto typed_descriptor = descriptor.mutable_wasm_function_descriptor();
   typed_descriptor->set_function_name(function_name);
   typed_descriptor->set_caller(caller);
   typed_descriptor->set_class_name(class_name);

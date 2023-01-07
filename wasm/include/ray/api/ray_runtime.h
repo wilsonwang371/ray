@@ -32,7 +32,7 @@ struct RemoteFunctionHolder {
   RemoteFunctionHolder(const std::string &module_name,
                        const std::string &function_name,
                        const std::string &class_name = "",
-                       LangType lang_type = LangType::CPP) {
+                       LangType lang_type = LangType::WASM) {
     this->module_name = module_name;
     this->function_name = function_name;
     this->class_name = class_name;
@@ -49,7 +49,7 @@ struct RemoteFunctionHolder {
   std::string module_name;
   std::string function_name;
   std::string class_name;
-  LangType lang_type = LangType::CPP;
+  LangType lang_type = LangType::WASM;
 };
 
 class RayRuntime {

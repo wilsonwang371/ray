@@ -162,7 +162,7 @@ InvocationSpec BuildInvocationSpec1(TaskType task_type,
   invocation_spec.remote_function_holder = remote_function_holder;
   invocation_spec.actor_id = actor;
   invocation_spec.args =
-      TransformArgs(args, remote_function_holder.lang_type != LangType::CPP);
+      TransformArgs(args, remote_function_holder.lang_type != LangType::WASM);
   return invocation_spec;
 }
 

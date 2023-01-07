@@ -268,7 +268,7 @@ inline ray::internal::ActorCreator<JavaActorClass> Actor(JavaActorClass func) {
 /// Normal task.
 template <typename F>
 inline ray::internal::TaskCaller<F> Task(F func) {
-  static_assert(!ray::internal::is_python_v<F>, "Must be a cpp function.");
+  static_assert(!ray::internal::is_python_v<F>, "Must be a wasm function.");
   static_assert(!std::is_member_function_pointer_v<F>,
                 "Incompatible type: member function cannot be called with ray::Task.");
   auto func_name = internal::FunctionManager::Instance().GetFunctionName(func);

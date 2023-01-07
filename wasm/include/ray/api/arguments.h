@@ -44,7 +44,7 @@ class Arguments {
         PushReferenceArg(task_args, std::forward<InputArgTypes>(arg));
       }
     } else {
-      if (lang_type == LangType::CPP) {
+      if (lang_type == LangType::CPP || lang_type == LangType::WASM) {
         if constexpr (is_actor_handle_v<InputArgTypes>) {
           auto serialized_actor_handle =
               RayRuntimeHolder::Instance().Runtime()->SerializeActorHandle(arg.ID());
