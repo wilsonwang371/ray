@@ -28,6 +28,7 @@ NativeRayRuntime::NativeRayRuntime() {
   object_store_ = std::unique_ptr<ObjectStore>(new NativeObjectStore());
   task_submitter_ = std::unique_ptr<TaskSubmitter>(new NativeTaskSubmitter());
   task_executor_ = std::make_unique<TaskExecutor>();
+  wasm_engine_ = std::make_unique<wasmtime::Engine>();
 
   auto bootstrap_address = ConfigInternal::Instance().bootstrap_ip;
   if (bootstrap_address.empty()) {

@@ -29,6 +29,7 @@ LocalModeRayRuntime::LocalModeRayRuntime()
               JobID::Nil()) {
   object_store_ = std::unique_ptr<ObjectStore>(new LocalModeObjectStore(*this));
   task_submitter_ = std::unique_ptr<TaskSubmitter>(new LocalModeTaskSubmitter(*this));
+  wasm_engine_ = std::make_unique<wasmtime::Engine>();
 }
 
 ActorID LocalModeRayRuntime::GetNextActorID() {

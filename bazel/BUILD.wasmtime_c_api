@@ -1,0 +1,48 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "wasmtime_c_api",
+    srcs = select({
+        "@bazel_tools//src/conditions:darwin": glob(["lib/**/*.dylib"]),
+        "@bazel_tools//src/conditions:windows": [
+            #TODO: add dependencies for windows.
+        ],
+        "//conditions:default": glob(["lib/**/*.so"]),
+    }),
+    hdrs = glob([
+        "include/**/*.h",
+        "include/**/*.hpp",
+    ]),
+    includes = [
+        "include/",
+    ],
+    linkopts = ["-lwasmtime"],
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "libwasmtime.so",
+    srcs = select({
+        "@bazel_tools//src/conditions:darwin": glob(["lib/**/*.dylib"]),
+        "@bazel_tools//src/conditions:windows": [
+            #TODO: add dependencies for windows.
+        ],
+        "//conditions:default": glob(["lib/**/*.so"]),
+    }),
+    visibility = ["//visibility:public"],
+)
+
+
+'''cc_import(
+    name = "wasmtime_c_api",
+    shared_library = glob([
+        "lib/**/*.so",
+    ])[0],
+    hdrs = glob([
+        "include/**/*.h",
+        "include/**/*.hpp",
+    ]),
+    visibility = ["//visibility:public"],
+)
+'''

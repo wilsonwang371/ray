@@ -27,6 +27,7 @@
 #include "ray/common/id.h"
 #include "ray/core_worker/context.h"
 #include "ray/core_worker/core_worker.h"
+#include "wasmtime/wasmtime.hh"
 
 namespace ray {
 namespace internal {
@@ -117,6 +118,7 @@ class AbstractRayRuntime : public RayRuntime {
   std::unique_ptr<TaskExecutor> task_executor_;
   std::unique_ptr<ObjectStore> object_store_;
   std::unique_ptr<ray::gcs::GlobalStateAccessor> global_state_accessor_;
+  std::unique_ptr<wasmtime::Engine> wasm_engine_;
 
  private:
   static std::shared_ptr<AbstractRayRuntime> abstract_ray_runtime_;

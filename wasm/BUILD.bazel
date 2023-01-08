@@ -2,6 +2,36 @@
 
 load("//bazel:ray.bzl", "COPTS")
 
+cc_library(
+    name = "wasm_engine",
+    deps = select({
+        "@bazel_tools//src/conditions:darwin": [
+            "@wasmtime_c_api_macos//:wasmtime_c_api",
+        ],
+        "@bazel_tools//src/conditions:windows": [
+            #TODO: Add the dependencies on windows.
+        ],
+        "//conditions:default": [
+            "@wasmtime_c_api_linux//:wasmtime_c_api",
+        ],
+    }),
+)
+
+filegroup(
+    name = "wasm_engine_libs",
+    srcs = select({
+        "@bazel_tools//src/conditions:darwin": [
+            "@wasmtime_c_api_macos//:libwasmtime.so",
+        ],
+        "@bazel_tools//src/conditions:windows": [
+            #TODO: Add the dependencies on windows.
+        ],
+        "//conditions:default": [
+            "@wasmtime_c_api_linux//:libwasmtime.so",
+        ],
+    }),
+)
+
 cc_binary(
     name = "libray_wasm_api.so",
     copts = COPTS,
@@ -49,6 +79,7 @@ cc_library(
         "include/ray/*.h",
         "include/ray/**/*.h",
         "include/ray/**/**/*.h",
+        "include/wasmtime/*.hh",
     ]),
     copts = COPTS,
     linkopts = ["-ldl"],
@@ -66,6 +97,7 @@ cc_library(
         "@com_google_absl//absl/flags:parse",
         "@msgpack",
         "@nlohmann_json",
+        "wasm_engine",
     ],
     alwayslink = True,
 )
@@ -112,6 +144,7 @@ genrule(
         "wasm_worker",
         "ray_wasm_api",
         "libray_wasm_api.so",
+        "wasm_engine_libs",
     ],
     outs = ["ray_wasm_pkg.out"],
     cmd = """
@@ -120,7 +153,7 @@ genrule(
         rm -rf $$PY_WASM_DIR &&
         BOOST_DIR="$$PY_WASM_DIR/include/boost/" &&
         mkdir -p "$$BOOST_DIR" &&
-        mkdir -p "$$PY_WASM_DIR/lib/" &&
+        mkdir -p "$$PY_WASM_DIR/lib/wasmtime" &&
         cp -f $(location wasm_worker) "$$PY_WASM_DIR/" &&
         cp -f -r $$WORK_DIR/external/msgpack/include/* "$$PY_WASM_DIR/include" &&
         cp -f -r $$WORK_DIR/external/nlohmann_json/single_include/* "$$PY_WASM_DIR/include" &&
@@ -151,6 +184,7 @@ genrule(
         cp -f -r "$$WORK_DIR/external/boost/boost/utility" "$$BOOST_DIR" &&
         cp -f -r $$WORK_DIR/external/boost/boost/*.hpp "$$BOOST_DIR" &&
         cp -f $(locations libray_wasm_api.so) "$$PY_WASM_DIR/lib/" &&
+        cp -f $(locations wasm_engine_libs) "$$PY_WASM_DIR/lib/wasmtime" &&
         cp -f -r "$$WORK_DIR/wasm/include/ray" "$$PY_WASM_DIR/include" &&
         THIRDPARTY_DIR="$$WORK_DIR/wasm/example/thirdparty" &&
         rm -rf $$THIRDPARTY_DIR &&

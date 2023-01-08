@@ -93,6 +93,24 @@ def ray_deps_setup():
         sha256 = "3bd7828aa5af4b13b99c191e8b1e884ebfa9ad371b0ce264605d347f135d2568",
     )
 
+    http_archive(
+        name = "wasmtime_c_api_linux",
+        strip_prefix = "wasmtime-v4.0.0-x86_64-linux-c-api",
+        urls = [
+            "https://github.com/bytecodealliance/wasmtime/releases/download/v4.0.0/wasmtime-v4.0.0-x86_64-linux-c-api.tar.xz",
+        ],
+        build_file = "@com_github_ray_project_ray//bazel:BUILD.wasmtime_c_api",
+    )
+
+    http_archive(
+        name = "wasmtime_c_api_macos",
+        strip_prefix = "wasmtime-v4.0.0-x86_64-macos-c-api",
+        urls = [
+            "https://github.com/bytecodealliance/wasmtime/releases/download/v4.0.0/wasmtime-v4.0.0-x86_64-macos-c-api.tar.xz"
+        ],
+        build_file = "@com_github_ray_project_ray//bazel:BUILD.wasmtime_c_api",
+    )
+
     # NOTE(lingxuan.zlx): 3rd party dependencies could be accessed, so it suggests
     # all of http/git_repository should add prefix for patches defined in ray directory.
     auto_http_archive(
