@@ -17,6 +17,22 @@ cc_library(
     }),
 )
 
+cc_library(
+    name = "wasm_engine_static",
+    deps = select({
+        "@bazel_tools//src/conditions:darwin": [
+            "@wasmtime_c_api_macos//:wasmtime_c_api_static",
+        ],
+        "@bazel_tools//src/conditions:windows": [
+            #TODO: Add the dependencies on windows.
+        ],
+        "//conditions:default": [
+            "@wasmtime_c_api_linux//:wasmtime_c_api_static",
+        ],
+    }),
+    linkstatic = 1,
+)
+
 filegroup(
     name = "wasm_engine_libs",
     srcs = select({
@@ -79,7 +95,9 @@ cc_library(
         "include/ray/*.h",
         "include/ray/**/*.h",
         "include/ray/**/**/*.h",
-        "include/wasmtime/*.hh",
+        "include/engine/**/*.hh",
+        "include/engine/*.h",
+        "include/engine/**/*.h",
     ]),
     copts = COPTS,
     linkopts = ["-ldl"],
@@ -97,7 +115,7 @@ cc_library(
         "@com_google_absl//absl/flags:parse",
         "@msgpack",
         "@nlohmann_json",
-        "wasm_engine",
+        "wasm_engine_static", # "wasm_engine" for dynamic linking.
     ],
     alwayslink = True,
 )

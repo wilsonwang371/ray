@@ -27,7 +27,7 @@
 #include "ray/common/id.h"
 #include "ray/core_worker/context.h"
 #include "ray/core_worker/core_worker.h"
-#include "wasmtime/wasmtime.hh"
+#include "engine/wasm_engine.h"
 
 namespace ray {
 namespace internal {
