@@ -21,14 +21,37 @@
 #include "./task/native_task_submitter.h"
 #include "ray/common/ray_config.h"
 
+using namespace wasm_engine;
+
 namespace ray {
 namespace internal {
+
+void register_ray_functions(WasmLinker &linker) {
+  unwrap(linker.func_new(
+    "ray", "get", WasmFunctionType({WasmValueType::I32}, {}),
+    [](auto caller, auto params, auto results) -> auto {
+      return std::monostate();
+    }));
+
+  unwrap(linker.func_new(
+    "ray", "put", WasmFunctionType({WasmValueType::I32}, {}),
+    [](auto caller, auto params, auto results) -> auto {
+      return std::monostate();
+    }));
+}
 
 NativeRayRuntime::NativeRayRuntime() {
   object_store_ = std::unique_ptr<ObjectStore>(new NativeObjectStore());
   task_submitter_ = std::unique_ptr<TaskSubmitter>(new NativeTaskSubmitter());
   task_executor_ = std::make_unique<TaskExecutor>();
-  wasm_engine_ = std::make_unique<wasmtime::Engine>();
+  wasm_engine_ = std::make_unique<WasmEngine>();
+
+  RAY_LOG(INFO) << "NativeRayRuntime init success";
+  WasmStore wasm_store(*wasm_engine_);
+  WasmLinker wasm_linker(*wasm_engine_);
+
+  unwrap(wasm_linker.define_wasi());
+  register_ray_functions(wasm_linker);
 
   auto bootstrap_address = ConfigInternal::Instance().bootstrap_ip;
   if (bootstrap_address.empty()) {
