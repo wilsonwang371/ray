@@ -90,6 +90,7 @@ cc_library(
         "src/ray/util/*.h",
         "src/ray/*.cc",
         "src/ray/*.h",
+        "src/engine/*.cc",
     ]),
     hdrs = glob([
         "include/ray/*.h",
