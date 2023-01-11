@@ -156,6 +156,46 @@ cc_binary(
     })
 )
 
+# cc_binary(
+#     name = "raywa",
+#     srcs = glob([
+#         "src/cmd/**/*.cc",
+#         "include/cmd/**/*.h",
+#         "include/cmd/**/*.hpp",
+#     ]),
+#     includes = ["include"],
+#     linkstatic = True,
+#     deps = [
+#         "ray_wasm_api",
+#     ],
+# )
+
+cc_binary(
+    name = "raywa",
+    srcs = glob([
+        "src/cmd/**/*.cc",
+        "include/**/*.h",
+        "include/**/*.hpp",
+    ]),
+    includes = ["include"],
+    copts = COPTS,
+    linkstatic = True,
+    deps = select({
+        "@bazel_tools//src/conditions:windows": [
+            # TODO: Add Windows support.
+            "//wasm:ray_wasm_api",
+        ],
+        "//conditions:default": [
+            # TODO: Add Linux support.
+            "ray_wasm_lib",
+            "@boost//:callable_traits",
+            "@boost//:optional",
+            "@msgpack",
+            "@nlohmann_json",
+        ],
+    })
+)
+
 
 genrule(
     name = "ray_wasm_pkg",
@@ -164,6 +204,7 @@ genrule(
         "ray_wasm_api",
         "libray_wasm_api.so",
         "wasm_engine_libs",
+        "raywa",
     ],
     outs = ["ray_wasm_pkg.out"],
     cmd = """
@@ -173,6 +214,7 @@ genrule(
         BOOST_DIR="$$PY_WASM_DIR/include/boost/" &&
         mkdir -p "$$BOOST_DIR" &&
         mkdir -p "$$PY_WASM_DIR/lib/wasmtime" &&
+        cp -f $(location raywa) "$$PY_WASM_DIR/" &&
         cp -f $(location wasm_worker) "$$PY_WASM_DIR/" &&
         cp -f -r $$WORK_DIR/external/msgpack/include/* "$$PY_WASM_DIR/include" &&
         cp -f -r $$WORK_DIR/external/nlohmann_json/single_include/* "$$PY_WASM_DIR/include" &&

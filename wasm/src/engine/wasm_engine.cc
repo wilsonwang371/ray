@@ -53,4 +53,6 @@ void RegisterWasmRayHandlers(WasmLinker &linker) {
       }));
 }
 
+// TODO: refer to https://github.com/Mossaka/wasi-callback/blob/main/src/main.rs for a way to register a callback
+
 }  // namespace wasm_engine

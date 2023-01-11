@@ -1,0 +1,192 @@
+
+test.wasm:	file format wasm 0x1
+
+Sections:
+
+     Type start=0x0000000a end=0x00000021 (size=0x00000017) count: 5
+   Import start=0x00000023 end=0x00000052 (size=0x0000002f) count: 2
+ Function start=0x00000054 end=0x0000005e (size=0x0000000a) count: 9
+    Table start=0x00000060 end=0x00000065 (size=0x00000005) count: 1
+   Memory start=0x00000067 end=0x0000006a (size=0x00000003) count: 1
+   Global start=0x0000006c end=0x00000074 (size=0x00000008) count: 1
+   Export start=0x00000076 end=0x00000089 (size=0x00000013) count: 2
+     Elem start=0x0000008b end=0x00000092 (size=0x00000007) count: 1
+     Code start=0x00000095 end=0x000001a6 (size=0x00000111) count: 9
+   Custom start=0x000001a9 end=0x00000268 (size=0x000000bf) "name"
+   Custom start=0x0000026a end=0x000002e0 (size=0x00000076) "producers"
+
+Section Details:
+
+Type[5]:
+ - type[0] (i32, i32) -> nil
+ - type[1] (i32) -> nil
+ - type[2] () -> nil
+ - type[3] (i32, i32) -> i32
+ - type[4] () -> i32
+Import[2]:
+ - func[0] sig=0 <rcall> <- ray.call
+ - func[1] sig=1 <__imported_wasi_snapshot_preview1_proc_exit> <- wasi_snapshot_preview1.proc_exit
+Function[9]:
+ - func[2] sig=2 <_start>
+ - func[3] sig=3 <add>
+ - func[4] sig=4 <__original_main>
+ - func[5] sig=1 <__wasi_proc_exit>
+ - func[6] sig=1 <_Exit>
+ - func[7] sig=2 <dummy>
+ - func[8] sig=2 <__wasm_call_dtors>
+ - func[9] sig=1 <exit>
+ - func[10] sig=2 <_start.command_export>
+Table[1]:
+ - table[0] type=funcref initial=2 max=2
+Memory[1]:
+ - memory[0] pages: initial=2
+Global[1]:
+ - global[0] i32 mutable=1 <__stack_pointer> - init i32=66560
+Export[2]:
+ - memory[0] -> "memory"
+ - func[10] <_start.command_export> -> "_start"
+Elem[1]:
+ - segment[0] flags=0 table=0 count=1 - init i32=1
+  - elem[1] = func[3] <add>
+Code[9]:
+ - func[2] size=27 <_start>
+ - func[3] size=61 <add>
+ - func[4] size=108 <__original_main>
+ - func[5] size=11 <__wasi_proc_exit>
+ - func[6] size=11 <_Exit>
+ - func[7] size=2 <dummy>
+ - func[8] size=14 <__wasm_call_dtors>
+ - func[9] size=23 <exit>
+ - func[10] size=6 <_start.command_export>
+Custom:
+ - name: "name"
+ - func[0] <rcall>
+ - func[1] <__imported_wasi_snapshot_preview1_proc_exit>
+ - func[2] <_start>
+ - func[3] <add>
+ - func[4] <__original_main>
+ - func[5] <__wasi_proc_exit>
+ - func[6] <_Exit>
+ - func[7] <dummy>
+ - func[8] <__wasm_call_dtors>
+ - func[9] <exit>
+ - func[10] <_start.command_export>
+ - global[0] <__stack_pointer>
+Custom:
+ - name: "producers"
+
+Code Disassembly:
+
+000097 func[2] <_start>:
+ 000098: 01 7f                      | local[0] type=i32
+ 00009a: 02 40                      | block
+ 00009c: 10 84 80 80 80 00          |   call 4 <__original_main>
+ 0000a2: 22 00                      |   local.tee 0
+ 0000a4: 45                         |   i32.eqz
+ 0000a5: 0d 00                      |   br_if 0
+ 0000a7: 20 00                      |   local.get 0
+ 0000a9: 10 89 80 80 80 00          |   call 9 <exit>
+ 0000af: 00                         |   unreachable
+ 0000b0: 0b                         | end
+ 0000b1: 0b                         | end
+0000b3 func[3] <add>:
+ 0000b4: 06 7f                      | local[2..7] type=i32
+ 0000b6: 23 80 80 80 80 00          | global.get 0 <__stack_pointer>
+ 0000bc: 21 02                      | local.set 2
+ 0000be: 41 10                      | i32.const 16
+ 0000c0: 21 03                      | local.set 3
+ 0000c2: 20 02                      | local.get 2
+ 0000c4: 20 03                      | local.get 3
+ 0000c6: 6b                         | i32.sub
+ 0000c7: 21 04                      | local.set 4
+ 0000c9: 20 04                      | local.get 4
+ 0000cb: 20 00                      | local.get 0
+ 0000cd: 36 02 0c                   | i32.store 2 12
+ 0000d0: 20 04                      | local.get 4
+ 0000d2: 20 01                      | local.get 1
+ 0000d4: 36 02 08                   | i32.store 2 8
+ 0000d7: 20 04                      | local.get 4
+ 0000d9: 28 02 0c                   | i32.load 2 12
+ 0000dc: 21 05                      | local.set 5
+ 0000de: 20 04                      | local.get 4
+ 0000e0: 28 02 08                   | i32.load 2 8
+ 0000e3: 21 06                      | local.set 6
+ 0000e5: 20 05                      | local.get 5
+ 0000e7: 20 06                      | local.get 6
+ 0000e9: 6a                         | i32.add
+ 0000ea: 21 07                      | local.set 7
+ 0000ec: 20 07                      | local.get 7
+ 0000ee: 0f                         | return
+ 0000ef: 0b                         | end
+0000f1 func[4] <__original_main>:
+ 0000f2: 0a 7f                      | local[0..9] type=i32
+ 0000f4: 23 80 80 80 80 00          | global.get 0 <__stack_pointer>
+ 0000fa: 21 00                      | local.set 0
+ 0000fc: 41 10                      | i32.const 16
+ 0000fe: 21 01                      | local.set 1
+ 000100: 20 00                      | local.get 0
+ 000102: 20 01                      | local.get 1
+ 000104: 6b                         | i32.sub
+ 000105: 21 02                      | local.set 2
+ 000107: 20 02                      | local.get 2
+ 000109: 24 80 80 80 80 00          | global.set 0 <__stack_pointer>
+ 00010f: 41 00                      | i32.const 0
+ 000111: 21 03                      | local.set 3
+ 000113: 20 02                      | local.get 2
+ 000115: 20 03                      | local.get 3
+ 000117: 36 02 0c                   | i32.store 2 12
+ 00011a: 41 02                      | i32.const 2
+ 00011c: 21 04                      | local.set 4
+ 00011e: 20 02                      | local.get 2
+ 000120: 20 04                      | local.get 4
+ 000122: 36 02 04                   | i32.store 2 4
+ 000125: 41 01                      | i32.const 1
+ 000127: 21 05                      | local.set 5
+ 000129: 20 02                      | local.get 2
+ 00012b: 20 05                      | local.get 5
+ 00012d: 36 02 00                   | i32.store 2 0
+ 000130: 41 81 80 80 80 00          | i32.const 1
+ 000136: 21 06                      | local.set 6
+ 000138: 20 06                      | local.get 6
+ 00013a: 20 02                      | local.get 2
+ 00013c: 10 80 80 80 80 00          | call 0 <rcall>
+ 000142: 41 00                      | i32.const 0
+ 000144: 21 07                      | local.set 7
+ 000146: 41 10                      | i32.const 16
+ 000148: 21 08                      | local.set 8
+ 00014a: 20 02                      | local.get 2
+ 00014c: 20 08                      | local.get 8
+ 00014e: 6a                         | i32.add
+ 00014f: 21 09                      | local.set 9
+ 000151: 20 09                      | local.get 9
+ 000153: 24 80 80 80 80 00          | global.set 0 <__stack_pointer>
+ 000159: 20 07                      | local.get 7
+ 00015b: 0f                         | return
+ 00015c: 0b                         | end
+00015e func[5] <__wasi_proc_exit>:
+ 00015f: 20 00                      | local.get 0
+ 000161: 10 81 80 80 80 00          | call 1 <__imported_wasi_snapshot_preview1_proc_exit>
+ 000167: 00                         | unreachable
+ 000168: 0b                         | end
+00016a func[6] <_Exit>:
+ 00016b: 20 00                      | local.get 0
+ 00016d: 10 85 80 80 80 00          | call 5 <__wasi_proc_exit>
+ 000173: 00                         | unreachable
+ 000174: 0b                         | end
+000176 func[7] <dummy>:
+ 000177: 0b                         | end
+000179 func[8] <__wasm_call_dtors>:
+ 00017a: 10 87 80 80 80 00          | call 7 <dummy>
+ 000180: 10 87 80 80 80 00          | call 7 <dummy>
+ 000186: 0b                         | end
+000188 func[9] <exit>:
+ 000189: 10 87 80 80 80 00          | call 7 <dummy>
+ 00018f: 10 87 80 80 80 00          | call 7 <dummy>
+ 000195: 20 00                      | local.get 0
+ 000197: 10 86 80 80 80 00          | call 6 <_Exit>
+ 00019d: 00                         | unreachable
+ 00019e: 0b                         | end
+0001a0 func[10] <_start.command_export>:
+ 0001a1: 10 02                      | call 2 <_start>
+ 0001a3: 10 08                      | call 8 <__wasm_call_dtors>
+ 0001a5: 0b                         | end
