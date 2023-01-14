@@ -19,8 +19,9 @@
 
 namespace wasm_engine {
 
-WasmModule CompileWasmModule(WasmEngine &engine, std::string &code) {
-  return unwrap(WasmModule::compile(engine, code));
+WasmModule CompileWasmModule(WasmEngine &engine, uint8_t *code, size_t length) {
+  auto data = Span<uint8_t>(reinterpret_cast<uint8_t *>(code), length);
+  return unwrap(WasmModule::compile(engine, data));
 }
 
 WasmInstance InstantiateWasmModule(WasmLinker &linker,
@@ -38,7 +39,6 @@ void ExecuteInstanceFunction(WasmInstance &instance,
 }
 
 void RegisterWasmRayHandlers(WasmLinker &linker) {
-  unwrap(linker.define_wasi());
   unwrap(linker.func_new(
       "ray", "get", WasmFunctionType({WasmValueType::I32}, {}), [
       ](auto caller, auto params, auto results) -> auto{ return std::monostate(); }));

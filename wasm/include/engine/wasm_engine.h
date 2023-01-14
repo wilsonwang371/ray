@@ -32,13 +32,15 @@ typedef FuncType WasmFunctionType;
 typedef ValKind WasmValueType;
 typedef Caller WasmCaller;
 
+typedef Table WasmTable;
+
 #elif defined(ENGINE_WAVM)
 // TODO: add wavm engine
 #elif defined(ENGINE_WAMR)
 // TODO: add wamr engine
 #endif
 
-WasmModule CompileWasmModule(WasmEngine &engine, std::string &code);
+WasmModule CompileWasmModule(WasmEngine &engine, uint8_t *code, size_t length);
 
 WasmInstance InstantiateWasmModule(WasmLinker &linker,
                                    WasmStore &store,

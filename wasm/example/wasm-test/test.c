@@ -10,6 +10,7 @@ int add(int a, int b) { return a + b; }
 // main function
 int main() {
   // call remote function
+  fprintf(stderr, "call remote function: %p\n", add);
   REMOTE(add, 1, 2);
   return 0;
 }
