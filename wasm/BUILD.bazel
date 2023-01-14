@@ -176,6 +176,7 @@ cc_binary(
         "src/cmd/**/*.cc",
         "include/**/*.h",
         "include/**/*.hpp",
+        "include/**/*.hh",
     ]),
     includes = ["include"],
     copts = COPTS,
@@ -192,6 +193,8 @@ cc_binary(
             "@boost//:optional",
             "@msgpack",
             "@nlohmann_json",
+            "//:core_worker_lib",
+            "wasm_engine_static",
         ],
     })
 )

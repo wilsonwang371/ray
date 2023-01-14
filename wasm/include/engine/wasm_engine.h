@@ -6,6 +6,8 @@ namespace wasm_engine {
 
 #if defined(ENGINE_WASMTIME)
 
+using namespace std;
+
 #include "wasmtime.hh"
 using namespace wasmtime;
 

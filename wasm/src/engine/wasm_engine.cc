@@ -49,6 +49,8 @@ void RegisterWasmRayHandlers(WasmLinker &linker) {
 
   unwrap(linker.func_wrap(
       "ray", "call", [](WasmCaller caller, int32_t name, int32_t args) -> auto{
+        caller.get_export("table");
+        // TODO:
         return std::monostate();
       }));
 }
