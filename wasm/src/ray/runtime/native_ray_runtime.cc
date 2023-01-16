@@ -36,7 +36,7 @@ NativeRayRuntime::NativeRayRuntime() {
   WasmStore wasm_store(*wasm_engine_);
   WasmLinker wasm_linker(*wasm_engine_);
 
-  RegisterWasmRayHandlers(wasm_linker);
+  register_ray_handlers(wasm_linker);
 
   auto bootstrap_address = ConfigInternal::Instance().bootstrap_ip;
   if (bootstrap_address.empty()) {

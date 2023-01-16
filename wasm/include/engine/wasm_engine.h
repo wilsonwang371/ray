@@ -1,6 +1,9 @@
 #pragma once
 
 #define ENGINE_WASMTIME 1
+#define RAYWA_DEBUG 1
+
+#define WASMFUNC_TBL_NAME "__indirect_function_table"
 
 namespace wasm_engine {
 
@@ -31,6 +34,7 @@ typedef FuncType WasmFunctionType;
 
 typedef ValKind WasmValueType;
 typedef Caller WasmCaller;
+typedef Val WasmValue;
 
 typedef Table WasmTable;
 
@@ -40,17 +44,34 @@ typedef Table WasmTable;
 // TODO: add wamr engine
 #endif
 
-WasmModule CompileWasmModule(WasmEngine &engine, uint8_t *code, size_t length);
+WasmModule compile_wasm_module(WasmEngine &, uint8_t *, size_t);
 
-WasmInstance InstantiateWasmModule(WasmLinker &linker,
-                                   WasmStore &store,
-                                   WasmModule &module);
+WasmInstance init_wasm_module(WasmLinker &, WasmStore &, WasmModule &);
 
-void ExecuteInstanceFunction(WasmInstance &instance,
-                             WasmStore &store,
-                             std::string &func_name,
-                             const std::vector<Val> &params);
+void register_ray_handlers(WasmLinker &);
 
-void RegisterWasmRayHandlers(WasmLinker &linker);
+/* get raw pointer of function */
+size_t function_raw_pointer(WasmStore &, WasmFunction &);
+
+/* get function from exports by function name */
+optional<WasmFunction> function_from_exports(WasmInstance &, WasmStore &, const char *);
+
+/* get table from exports by table name */
+optional<WasmTable> table_from_exports(WasmInstance &, WasmStore &, const char *);
+
+/* get function pointer from exports by item index */
+optional<WasmFunction> function_from_exports(WasmInstance &, WasmStore &, int);
+
+/* get function pointer from table using table class */
+optional<WasmFunction> function_from_table(WasmInstance &, WasmStore &, WasmTable &, int);
+
+/* get function pointer from table using table name */
+optional<WasmFunction> function_from_table(WasmInstance &,
+                                           WasmStore &,
+                                           const char *,
+                                           int);
+
+/* call function by name */
+void call_function_by_name(WasmInstance &, WasmStore &, const char *, vector<WasmValue>);
 
 }  // namespace wasm_engine

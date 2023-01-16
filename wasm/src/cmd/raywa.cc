@@ -8,21 +8,14 @@
 #include <cmd/CLI11.hpp>
 // clang-format on
 
-#define FUNC_TABLE_NAME "__indirect_function_table"
-
 using namespace std;
 using namespace wasm_engine;
-
-/// common function
-int Plus(int x, int y) { return x + y; }
-/// Declare remote function
-RAY_REMOTE(Plus);
 
 uint8_t *read_file(const string &file_name, size_t *length_ptr) {
   // read all bytes from wasm file
   ifstream infile(file_name, ios::binary | ios::ate);
   if (!infile.is_open()) {
-    cout << "Failed to open wasm file" << endl;
+    cerr << "failed to open wasm file" << endl;
     return 0;
   }
 
@@ -54,7 +47,9 @@ int main(int argc, char **argv) {
     cout << "Please specify wasm file" << endl;
     return 0;
   }
-  cout << "wasm_file = " << wasm_file << endl;
+#ifdef RAYWA_DEBUG
+  cerr << "wasm_file = " << wasm_file << endl;
+#endif
 
   size_t length = 0;
   auto wasm_bytes = read_file(wasm_file, &length);
@@ -72,66 +67,64 @@ int main(int argc, char **argv) {
   store.context().set_wasi(std::move(wasi)).unwrap();
 
   unwrap(linker.define_wasi());
-  RegisterWasmRayHandlers(linker);
+  register_ray_handlers(linker);
 
-  auto module = CompileWasmModule(engine, wasm_bytes, length);
-  auto instance = InstantiateWasmModule(linker, store, module);
+  auto module = compile_wasm_module(engine, wasm_bytes, length);
+  auto instance = init_wasm_module(linker, store, module);
 
-  std::optional<Extern> export_tbl;
-  if (!(export_tbl = instance.get(store, FUNC_TABLE_NAME))) {
-    cout << "cannot get table: " << FUNC_TABLE_NAME << endl;
-    return 0;
-  }
+  //   auto table = table_from_exports(instance, store, WASMFUNC_TBL_NAME);
+  //   if (!table) {
+  //     cerr << "cannot get table: " << WASMFUNC_TBL_NAME << endl;
+  //     return 1;
+  //   }
 
-  // check variant type
-  if (!std::holds_alternative<WasmTable>(*export_tbl)) {
-    cout << "table " << FUNC_TABLE_NAME << " not found" << endl;
-    return 0;
-  }
+  //   // iterate table
+  //   for (int i = 0; i < table->size(store); i++) {
+  //     auto func = function_from_table(instance, store, WASMFUNC_TBL_NAME, i);
+  //     if (!func) {
+  //       continue;
+  //     }
 
-  auto table = std::get<WasmTable>(*export_tbl);
-  cout << "table size = " << table.size(store) << endl;
+  //     size_t raw = function_raw_pointer(store, *func);
 
-  // iterate table
-  for (int i = 0; i < table.size(store); i++) {
-    std::optional<Val> val;
-    if (!(val = table.get(store, i))) {
-      cout << "cannot get function at index " << i << endl;
-      continue;
-    }
+  //     if (i == 1) {
+  //       cerr << "calling function at index " << i << endl;
+  //       unwrap(func->call(store, {1, 3}));
+  //     }
 
-    if (val->kind() != ValKind::FuncRef) {
-      cout << "value at index " << i << " is not function" << endl;
-      continue;
-    }
+  //     // get the function type
+  //     WasmFunctionType func_type = func->type(store);
 
-    std::optional<WasmFunction> func = val->funcref();
-    if (!func) {
-      cout << "function at index " << i << " not found" << endl;
-      continue;
-    }
+  // #ifdef RAYWA_DEBUG
+  //     cerr << "function raw pointer: 0x" << hex << raw << ", ";
+  //     cerr << "table: " << WASMFUNC_TBL_NAME << " idx: " << i << ", ["
+  //          << func_type->params().size() << "] -> " << func_type->results().size()
+  //          << ", store id: " << func->raw_func().store_id
+  //          << ", idx: " << func->raw_func().index << endl;
+  // #endif
 
-    // get the function type
-    WasmFunctionType func_type = func->type(store);
+  //     for (int j = 0; j < 1000; j++) {
+  //       auto func_inner = function_from_exports(instance, store, j);
+  //       if (!func_inner) {
+  //         break;
+  //       }
+  //       if (func_inner->raw_func().store_id == func->raw_func().store_id &&
+  //           func_inner->raw_func().index == func->raw_func().index) {
+  //         cout << "found!! " << endl;
+  //       }
+  //     }
+  //   }
 
-    cout << func_type->params().size() << " -> " << func_type->results().size()
-         << endl;
-  }
+  // call_function_by_name(instance, store, "add", {1, 2});
 
   ray::Init();
 
-  // call main function
-  auto main_func = instance.get(store, "_start");
-  if (!main_func) {
-    cout << "main function not found" << endl;
-    return 0;
-  }
-  std::get<Func>(*main_func).call(store, {}).unwrap();
+  call_function_by_name(instance, store, "_start", {});
 
   /// common task
-  auto task_object = ray::Task(Plus).Remote(1, 2);
-  int task_result = *(ray::Get(task_object));
-  cout << "task_result = " << task_result << endl;
+  //auto task_object = ray::Task(Plus).Remote(1, 2);
+  //int task_result = *(ray::Get(task_object));
+  //cerr << "task_result = " << task_result << endl;
 
   ray::Shutdown();
 
