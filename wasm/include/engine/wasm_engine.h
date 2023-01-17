@@ -31,6 +31,7 @@ typedef Instance WasmInstance;
 
 typedef Func WasmFunction;
 typedef FuncType WasmFunctionType;
+typedef Memory WasmMemory;
 
 typedef ValKind WasmValueType;
 typedef Caller WasmCaller;

@@ -2784,6 +2784,11 @@ public:
     return wasmtime_memory_size(cx.ptr, &memory);
   }
 
+  /// Return the size, in bytes, of this memory.
+  uint64_t data_size(Store::Context cx) const {
+    return wasmtime_memory_data_size(cx.ptr, &memory);
+  }
+
   /// Returns a `span` of where this memory is located in the host.
   ///
   /// Note that embedders need to be very careful in their usage of the returned

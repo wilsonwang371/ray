@@ -43,7 +43,7 @@ void register_ray_handlers(WasmLinker &linker) {
       ](auto caller, auto params, auto results) -> auto{ return monostate(); }));
 
   unwrap(linker.func_wrap(
-      "ray", "call", [](WasmCaller caller, int32_t funcref_idx) -> auto{
+      "ray", "call", [](WasmCaller caller, int32_t funcref_idx, int32_t args) -> auto{
         auto tbl = caller.get_export(WASMFUNC_TBL_NAME);
         if (!holds_alternative<WasmTable>(*tbl)) {
           cerr << "cannot get function table: " << WASMFUNC_TBL_NAME << endl;
@@ -63,10 +63,30 @@ void register_ray_handlers(WasmLinker &linker) {
           return monostate();
         }
 #ifdef RAYWA_DEBUG
-        cerr << "create remote function: 0x" << hex << funcref_idx << endl;
+        cerr << "create remote function: 0x" << hex << funcref_idx << " args 0x" << args
+             << endl;
 #endif
         ray::internal::RegisterRemoteFunctions(to_string(funcref_idx),
                                                (void (*)())(0L + funcref_idx));
+        optional<Extern> export_memory = caller.get_export("memory");
+        if (!export_memory) {
+          cerr << "cannot get memory" << endl;
+          return monostate();
+        }
+        if (!holds_alternative<WasmMemory>(*export_memory)) {
+          cerr << "memory not found" << endl;
+          return monostate();
+        }
+
+        auto memory = get<WasmMemory>(*caller.get_export("memory"));
+        if (memory.data_size(caller.context()) <= args) {
+          cerr << "data address out of range: 0x" << hex << args << endl;
+          return monostate();
+        }
+
+#ifdef RAYWA_DEBUG
+        cerr << "memory size: 0x" << hex << memory.data_size(caller.context()) << endl;
+#endif
 
         return monostate();
       }));
