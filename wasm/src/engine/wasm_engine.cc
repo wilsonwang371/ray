@@ -14,9 +14,10 @@
 #include <ray/api.h>
 // clang-format off
 #include "ray/core_worker/context.h"
-#include "engine/wasm_engine.h"
+#include <engine/wasm_engine.h>
 // clang-format on
 
+#include <engine/utils.h>
 #include <ray/api/function_manager.h>
 #include <ray/api/overload.h>
 
@@ -62,12 +63,40 @@ void register_ray_handlers(WasmLinker &linker) {
           cerr << "cannot get function: " << funcref_idx << endl;
           return monostate();
         }
+
+        // print all parameters
+        auto func_type = func->type(caller.context());
+        auto params = func_type->params();
+        auto results = func_type->results();
 #ifdef RAYWA_DEBUG
-        cerr << "create remote function: 0x" << hex << funcref_idx << " args 0x" << args
-             << endl;
+        cerr << "function: " << funcref_idx << " params: " << params.size()
+             << " results: " << results.size() << endl;
 #endif
-        ray::internal::RegisterRemoteFunctions(to_string(funcref_idx),
-                                               (void (*)())(0L + funcref_idx));
+        // calculate bytes used by parameters
+        size_t params_bytes = 0;
+        for (auto &param : params) {
+#ifdef RAYWA_DEBUG
+          cerr << "param: " << param.kind() << endl;
+#endif
+          switch (param.kind()) {
+          case WasmValueType::I32:
+            params_bytes += sizeof(int32_t);
+            break;
+          case WasmValueType::I64:
+            params_bytes += sizeof(int64_t);
+            break;
+          case WasmValueType::F32:
+            params_bytes += sizeof(float);
+            break;
+          case WasmValueType::F64:
+            params_bytes += sizeof(double);
+            break;
+          default:
+            cerr << "unsupported parameter type: " << param.kind() << endl;
+            return monostate();
+          }
+        }
+
         optional<Extern> export_memory = caller.get_export("memory");
         if (!export_memory) {
           cerr << "cannot get memory" << endl;
@@ -84,8 +113,28 @@ void register_ray_handlers(WasmLinker &linker) {
           return monostate();
         }
 
+        // make sure the parameter size is within the memory range
+        if (memory.data_size(caller.context()) < args + params_bytes) {
+          cerr << "data address out of range: 0x" << hex << args << " + " << params_bytes
+               << endl;
+          return monostate();
+        }
+
 #ifdef RAYWA_DEBUG
         cerr << "memory size: 0x" << hex << memory.data_size(caller.context()) << endl;
+        print_hex(memory.data(caller.context()).data(), args, params_bytes);
+#endif
+
+#ifdef RAYWA_DEBUG
+        cerr << "create remote function: 0x" << hex << funcref_idx << " args 0x" << args
+             << endl;
+#endif
+        int (*fp)() = (int (*)())(0L + funcref_idx); // TODO fix this hack
+        ray::internal::RegisterRemoteFunctions(to_string(funcref_idx), fp);
+        auto object = ray::Task(fp).Remote();  // TODO args
+        auto result = ray::Get(object);
+#ifdef RAYWA_DEBUG
+        cerr << "put_get_result = " << result << endl;
 #endif
 
         return monostate();

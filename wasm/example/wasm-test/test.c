@@ -18,7 +18,7 @@ void dummy() { fprintf(stderr, "inside function dummy\n"); }
 int main() {
   // call remote function
   fprintf(stderr, "register remote function: add %p\n", add);
-  REMOTE(add, 2, 3);
+  REMOTE(add, (uint8_t)2, 3, 4, 5, 6, 7, 8, 9, 10);
   fprintf(stderr, "register remote function: dummy %p\n", dummy);
   REMOTE(dummy);
   return 0;
