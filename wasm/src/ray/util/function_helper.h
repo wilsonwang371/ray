@@ -24,12 +24,16 @@
 #include <string>
 #include <unordered_map>
 
+#include "ray/core_worker/context.h"
+#include <engine/wasm_engine.h>
+
 using namespace ::ray::internal;
+using namespace wasm_engine;
 
 namespace ray {
 namespace internal {
 
-using EntryFuntion = std::function<msgpack::sbuffer(
+using EntryFunction = std::function<msgpack::sbuffer(
     const std::string &, const ArgsBufferList &, msgpack::sbuffer *)>;
 
 class FunctionHelper {
@@ -44,22 +48,37 @@ class FunctionHelper {
 
   void LoadDll(const std::filesystem::path &lib_path);
   void LoadFunctionsFromPaths(const std::vector<std::string> &paths);
-  const EntryFuntion &GetExecutableFunctions(const std::string &function_name);
-  const EntryFuntion &GetExecutableMemberFunctions(const std::string &function_name);
+  const EntryFunction &GetExecutableFunctions(const std::string &function_name);
+  const EntryFunction &GetExecutableMemberFunctions(const std::string &function_name);
+
+  // wasm related functions
+  void LoadWasm(const std::filesystem::path &lib_path);
+  void LoadWasmFunctionsFromPaths(const std::vector<std::string> &paths);
+  const WasmFunction &GetWasmFunctions(const std::string &function_name);
+
+  std::shared_ptr<WasmEngine> wasm_engine_;
+  std::shared_ptr<WasmStore> wasm_store_;
+  std::shared_ptr<WasmLinker> wasm_linker_;
 
  private:
-  FunctionHelper() = default;
+  FunctionHelper();
   ~FunctionHelper() = default;
   FunctionHelper(FunctionHelper const &) = delete;
   FunctionHelper(FunctionHelper &&) = delete;
   std::string LoadAllRemoteFunctions(const std::string lib_path,
                                      const boost::dll::shared_library &lib,
-                                     const EntryFuntion &entry_function);
+                                     const EntryFunction &entry_function);
   std::unordered_map<std::string, std::shared_ptr<boost::dll::shared_library>> libraries_;
   // Map from remote function name to executable entry function.
-  std::unordered_map<std::string, EntryFuntion> remote_funcs_;
+  std::unordered_map<std::string, EntryFunction> remote_funcs_;
   // Map from remote member function name to executable entry function.
-  std::unordered_map<std::string, EntryFuntion> remote_member_funcs_;
+  std::unordered_map<std::string, EntryFunction> remote_member_funcs_;
+
+  // Map from wasm function name to executable entry function.
+  std::unordered_map<std::string, WasmFunction> wasm_funcs_;
+
+  std::unordered_map<std::string, WasmModule> wasm_modules_;
+  std::unordered_map<std::string, WasmInstance> wasm_instances_;
 };
 }  // namespace internal
 }  // namespace ray

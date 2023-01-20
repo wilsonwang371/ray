@@ -60,6 +60,9 @@ std::shared_ptr<AbstractRayRuntime> AbstractRayRuntime::DoInit() {
     // Load functions from code search path.
     FunctionHelper::GetInstance().LoadFunctionsFromPaths(
         ConfigInternal::Instance().code_search_path);
+    // Load wasm functions from code search path.
+    FunctionHelper::GetInstance().LoadWasmFunctionsFromPaths(
+        ConfigInternal::Instance().code_search_path);
   }
   abstract_ray_runtime_ = runtime;
   return runtime;

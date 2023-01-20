@@ -45,11 +45,15 @@ typedef Table WasmTable;
 // TODO: add wamr engine
 #endif
 
-WasmModule compile_wasm_module(WasmEngine &, uint8_t *, size_t);
+optional<WasmModule> compile_wasm_file(WasmEngine &, const string &);
 
-WasmInstance init_wasm_module(WasmLinker &, WasmStore &, WasmModule &);
+WasmModule compile_wasm_bytes(WasmEngine &, uint8_t *, size_t);
 
-void register_ray_handlers(WasmLinker &);
+optional<WasmInstance> init_wasm_module(WasmLinker &, WasmStore &, WasmModule &);
+
+void init_host_env(WasmLinker &, WasmStore &);
+
+// void register_ray_handlers(WasmLinker &);
 
 /* get raw pointer of function */
 size_t function_raw_pointer(WasmStore &, WasmFunction &);

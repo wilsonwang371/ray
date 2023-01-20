@@ -22,6 +22,14 @@
 namespace ray {
 namespace internal {
 
+FunctionHelper::FunctionHelper() {
+  RAY_LOG(INFO) << "FunctionHelper is initialized.";
+  wasm_engine_ = std::make_shared<WasmEngine>();
+  wasm_store_ = std::make_shared<WasmStore>(*wasm_engine_);
+  wasm_linker_ = std::make_shared<WasmLinker>(*wasm_engine_);
+  init_host_env(*wasm_linker_, *wasm_store_);
+}
+
 void FunctionHelper::LoadDll(const std::filesystem::path &lib_path) {
   RAY_LOG(INFO) << "Start loading the library " << lib_path << ".";
 
@@ -81,9 +89,75 @@ void FunctionHelper::LoadDll(const std::filesystem::path &lib_path) {
   return;
 }
 
+void FunctionHelper::LoadWasm(const std::filesystem::path &lib_path) {
+  RAY_LOG(INFO) << "Start loading the library " << lib_path << ".";
+  
+  auto module = compile_wasm_file(*wasm_engine_, lib_path.string());
+  if (!module) {
+    RAY_LOG(ERROR) << "cannot compile wasm file: " << lib_path.string();
+    return;
+  }
+
+  auto instance = init_wasm_module(*wasm_linker_, *wasm_store_, *module);
+  if (!instance) {
+    RAY_LOG(ERROR) << "cannot init wasm module: " << lib_path.string();
+    return;
+  }
+
+  RAY_LOG(INFO) << "Here2";
+  auto table = table_from_exports(*instance, *wasm_store_, WASMFUNC_TBL_NAME);
+  if (!table) {
+    cerr << "cannot get table: " << WASMFUNC_TBL_NAME << endl;
+    return;
+  }
+
+  wasm_instances_.emplace(lib_path.string(), *instance);
+  wasm_modules_.emplace(lib_path.string(), *module);
+
+  // iterate table
+  for (int i = 0; i < table->size(*wasm_store_); i++) {
+    auto func = function_from_table(*instance, *wasm_store_, WASMFUNC_TBL_NAME, i);
+    if (!func) {
+      continue;
+    }
+
+    if (i == 1) {
+      cerr << "calling function at index " << i << endl;
+      unwrap(func->call(*wasm_store_, {1, 3}));
+    }
+
+    // get the function type
+    WasmFunctionType func_type = func->type(*wasm_store_);
+
+    char func_name[256];
+    snprintf(func_name, sizeof(func_name), "%d", i);
+    wasm_funcs_.emplace(string(func_name), *func);
+
+#ifdef RAYWA_DEBUG
+    size_t raw = function_raw_pointer(*wasm_store_, *func);
+    cerr << "function raw pointer: 0x" << hex << raw << ", ";
+    cerr << "table: " << WASMFUNC_TBL_NAME << " idx: " << i << ", ["
+          << func_type->params().size() << "] -> " << func_type->results().size()
+          << ", store id: " << func->raw_func().store_id
+          << ", idx: " << func->raw_func().index << endl;
+#endif
+
+    // for (int j = 0; j < 1000; j++) {
+    //   auto func_inner = function_from_exports(instance, store, j);
+    //   if (!func_inner) {
+    //     break;
+    //   }
+    //   if (func_inner->raw_func().store_id == func->raw_func().store_id &&
+    //       func_inner->raw_func().index == func->raw_func().index) {
+    //     cout << "found!! " << endl;
+    //   }
+    // }
+  }
+}
+
 std::string FunctionHelper::LoadAllRemoteFunctions(const std::string lib_path,
                                                    const boost::dll::shared_library &lib,
-                                                   const EntryFuntion &entry_function) {
+                                                   const EntryFunction &entry_function) {
   static const std::string internal_function_name = "GetRemoteFunctions";
   if (!lib.has(internal_function_name)) {
     RAY_LOG(WARNING) << "Internal function '" << internal_function_name
@@ -118,6 +192,15 @@ std::string FunctionHelper::LoadAllRemoteFunctions(const std::string lib_path,
   return names_str;
 }
 
+void FindWasmBinary(std::filesystem::path path,
+                    std::list<std::filesystem::path> &wasm_binaries) {
+  static const std::unordered_set<std::string> wasm_binary_extension = {".wasm"};
+  auto extension = path.extension();
+  if (wasm_binary_extension.find(extension.string()) != wasm_binary_extension.end()) {
+    wasm_binaries.emplace_back(path);
+  }
+}
+
 void FindDynamicLibrary(std::filesystem::path path,
                         std::list<std::filesystem::path> &dynamic_libraries) {
 #if defined(_WIN32)
@@ -132,6 +215,29 @@ void FindDynamicLibrary(std::filesystem::path path,
   if (dynamic_library_extension.find(extension.string()) !=
       dynamic_library_extension.end()) {
     dynamic_libraries.emplace_back(path);
+  }
+}
+
+void FunctionHelper::LoadWasmFunctionsFromPaths(const std::vector<std::string> &paths) {
+  std::list<std::filesystem::path> wasm_binaries;
+  // Lookup wasm binaries from paths.
+  for (auto path : paths) {
+    if (std::filesystem::is_directory(path)) {
+      for (auto &entry :
+           boost::make_iterator_range(std::filesystem::directory_iterator(path), {})) {
+        FindWasmBinary(entry, wasm_binaries);
+      }
+    } else if (std::filesystem::exists(path)) {
+      FindWasmBinary(path, wasm_binaries);
+    } else {
+      RAY_LOG(FATAL) << path << " wasm binary not found.";
+    }
+  }
+
+  // Try to load all found wasm binaries.
+  for (auto wasm_binary : wasm_binaries) {
+    RAY_LOG(INFO) << "Found wasm binary: " << wasm_binary;
+    LoadWasm(wasm_binary);
   }
 }
 
@@ -157,7 +263,7 @@ void FunctionHelper::LoadFunctionsFromPaths(const std::vector<std::string> &path
   }
 }
 
-const EntryFuntion &FunctionHelper::GetExecutableFunctions(
+const EntryFunction &FunctionHelper::GetExecutableFunctions(
     const std::string &function_name) {
   auto it = remote_funcs_.find(function_name);
   if (it == remote_funcs_.end()) {
@@ -168,7 +274,17 @@ const EntryFuntion &FunctionHelper::GetExecutableFunctions(
   }
 }
 
-const EntryFuntion &FunctionHelper::GetExecutableMemberFunctions(
+const WasmFunction &FunctionHelper::GetWasmFunctions(const std::string &function_name) {
+  auto it = wasm_funcs_.find(function_name);
+  if (it == wasm_funcs_.end()) {
+    throw RayFunctionNotFound("Wasm function not found, the function name " +
+                              function_name);
+  } else {
+    return it->second;
+  }
+}
+
+const EntryFunction &FunctionHelper::GetExecutableMemberFunctions(
     const std::string &function_name) {
   auto it = remote_member_funcs_.find(function_name);
   if (it == remote_member_funcs_.end()) {

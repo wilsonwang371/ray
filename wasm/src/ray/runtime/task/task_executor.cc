@@ -23,6 +23,8 @@
 #include "ray/util/event.h"
 #include "ray/util/event_label.h"
 
+#include <engine/wasm_engine.h>
+
 namespace ray {
 
 namespace internal {
@@ -83,18 +85,23 @@ std::pair<Status, std::shared_ptr<msgpack::sbuffer>> GetExecuteResult(
     const ArgsBufferList &args_buffer,
     msgpack::sbuffer *actor_ptr) {
   try {
-    EntryFuntion entry_function;
+    wasmtime_func_t tmp;
+    WasmFunction entry_function(tmp);
     if (actor_ptr == nullptr) {
-      entry_function = FunctionHelper::GetInstance().GetExecutableFunctions(func_name);
-    } else {
-      entry_function =
-          FunctionHelper::GetInstance().GetExecutableMemberFunctions(func_name);
-    }
+      entry_function = FunctionHelper::GetInstance().GetWasmFunctions(func_name);
+    } 
+    // else {
+    //   entry_function =
+    //       FunctionHelper::GetInstance().GetExecutableMemberFunctions(func_name);
+    // }
     RAY_LOG(DEBUG) << "Get executable function " << func_name << " ok.";
-    auto result = entry_function(func_name, args_buffer, actor_ptr);
+    vector<WasmValue> args = {2, 3};
+    entry_function.call(*FunctionHelper::GetInstance().wasm_store_, args).unwrap();
+    // auto result = entry_function(func_name, args_buffer, actor_ptr);
     RAY_LOG(DEBUG) << "Execute function " << func_name << " ok.";
-    return std::make_pair(ray::Status::OK(),
-                          std::make_shared<msgpack::sbuffer>(std::move(result)));
+    return std::make_pair(ray::Status::IntentionalSystemExit(""), nullptr);
+    // return std::make_pair(ray::Status::OK(),
+    //                       std::make_shared<msgpack::sbuffer>(std::move(nullptr)));
   } catch (RayIntentionalSystemExitException &e) {
     RAY_LOG(ERROR) << "Ray intentional system exit while executing function(" << func_name
                    << ").";

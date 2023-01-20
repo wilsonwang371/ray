@@ -21,20 +21,72 @@
 #include <ray/api/function_manager.h>
 #include <ray/api/overload.h>
 
+#include <fstream>
+
+#include "ray/util/logging.h"
+
 using namespace std;
 
 namespace wasm_engine {
 
-WasmModule compile_wasm_module(WasmEngine &engine, uint8_t *code, size_t length) {
+static uint8_t *read_file(const string &file_name, size_t *length_ptr) {
+  // read all bytes from wasm file
+  ifstream infile(file_name, ios::binary | ios::ate);
+  if (!infile.is_open()) {
+    cerr << "failed to open wasm file" << endl;
+    return 0;
+  }
+
+  // get length of file
+  infile.seekg(0, std::ios::end);
+  size_t length = infile.tellg();
+  infile.seekg(0, std::ios::beg);
+
+  // allocate memory:
+  uint8_t *buffer = new uint8_t[length];
+  infile.read((char *)buffer, length);
+  infile.close();
+
+  *length_ptr = length;
+  return buffer;
+}
+
+// compile wasm file to wasm module
+optional<WasmModule> compile_wasm_file(WasmEngine &engine, const string &filename) {
+  size_t length;
+  uint8_t *code = read_file(filename, &length);
+  if (code == NULL) {
+    RAY_LOG(DEBUG) << "failed to read wasm file";
+    return nullopt;
+  }
+
+  auto module = compile_wasm_bytes(engine, code, length);
+  delete[] code;
+  return module;
+}
+
+WasmModule compile_wasm_bytes(WasmEngine &engine, uint8_t *code, size_t length) {
   auto data = Span<uint8_t>(reinterpret_cast<uint8_t *>(code), length);
   return unwrap(WasmModule::compile(engine, data));
 }
 
-WasmInstance init_wasm_module(WasmLinker &linker, WasmStore &store, WasmModule &module) {
-  return unwrap(linker.instantiate(store, module));
+optional<WasmInstance> init_wasm_module(WasmLinker &linker,
+                                        WasmStore &store,
+                                        WasmModule &module) {
+  RAY_LOG(DEBUG) << "start to instantiate wasm module";
+  auto result = linker.instantiate(store, module);
+  if (!result) {
+    RAY_LOG(ERROR) << "failed to instantiate wasm module";
+    return nullopt;
+  }
+  if (result) {
+    return optional<WasmInstance>(result.ok());
+  }
+  RAY_LOG(ERROR) << "failed to instantiate wasm module";
+  return nullopt;
 }
 
-void register_ray_handlers(WasmLinker &linker) {
+static void register_ray_handlers(WasmLinker &linker) {
   unwrap(linker.func_new(
       "ray", "get", WasmFunctionType({WasmValueType::I32}, {}), [
       ](auto caller, auto params, auto results) -> auto{ return monostate(); }));
@@ -129,16 +181,30 @@ void register_ray_handlers(WasmLinker &linker) {
         cerr << "create remote function: 0x" << hex << funcref_idx << " args 0x" << args
              << endl;
 #endif
-        int (*fp)() = (int (*)())(0L + funcref_idx); // TODO fix this hack
+        int (*fp)() = (int (*)())(0L + funcref_idx);  // TODO fix this hack
         ray::internal::RegisterRemoteFunctions(to_string(funcref_idx), fp);
-        auto object = ray::Task(fp).Remote();  // TODO args
-        auto result = ray::Get(object);
-#ifdef RAYWA_DEBUG
-        cerr << "put_get_result = " << result << endl;
-#endif
+        // auto object = ray::Task(fp).Remote();  // TODO args
+        // auto result = ray::Get(object);
+        ray::Task(fp).Remote();
+        // sleep for 5 second to wait for the result
+        sleep(5);
 
         return monostate();
       }));
+}
+
+/* init wasm host environment related stuff */
+void init_host_env(WasmLinker &linker, WasmStore &store) {
+  WasiConfig wasi;
+  wasi.inherit_argv();
+  wasi.inherit_env();
+  wasi.inherit_stdin();
+  wasi.inherit_stdout();
+  wasi.inherit_stderr();
+  store.context().set_wasi(std::move(wasi)).unwrap();
+
+  unwrap(linker.define_wasi());
+  register_ray_handlers(linker);
 }
 
 /* get raw pointer of function */

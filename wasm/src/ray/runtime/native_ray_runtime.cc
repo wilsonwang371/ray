@@ -32,11 +32,11 @@ NativeRayRuntime::NativeRayRuntime() {
   task_executor_ = std::make_unique<TaskExecutor>();
   wasm_engine_ = std::make_unique<WasmEngine>();
 
-  RAY_LOG(INFO) << "NativeRayRuntime init success";
-  WasmStore wasm_store(*wasm_engine_);
-  WasmLinker wasm_linker(*wasm_engine_);
+  // RAY_LOG(INFO) << "NativeRayRuntime init success";
+  // WasmStore wasm_store(*wasm_engine_);
+  // WasmLinker wasm_linker(*wasm_engine_);
 
-  register_ray_handlers(wasm_linker);
+  // register_ray_handlers(wasm_linker);
 
   auto bootstrap_address = ConfigInternal::Instance().bootstrap_ip;
   if (bootstrap_address.empty()) {
