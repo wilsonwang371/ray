@@ -24,8 +24,11 @@
 #include <fstream>
 
 #include "ray/util/logging.h"
+#include "stdio.h"
 
 using namespace std;
+
+static map<uint32_t, string> objref_map;
 
 namespace wasm_engine {
 
@@ -33,7 +36,7 @@ static uint8_t *read_file(const string &file_name, size_t *length_ptr) {
   // read all bytes from wasm file
   ifstream infile(file_name, ios::binary | ios::ate);
   if (!infile.is_open()) {
-    cerr << "failed to open wasm file" << endl;
+    RAY_LOG(DEBUG) << "failed to open wasm file";
     return 0;
   }
 
@@ -86,6 +89,76 @@ optional<WasmInstance> init_wasm_module(WasmLinker &linker,
   return nullopt;
 }
 
+template <typename T>
+uint32_t launch_remote(ValType::ListRef params_fmt,
+                       T (*fp)(),
+                       int32_t funcref_idx,
+                       int32_t args,
+                       WasmMemory &memory,
+                       WasmCaller &caller) {
+  ray::internal::RegisterRemoteFunctions(to_string(funcref_idx), fp);
+  auto task = ray::Task(fp);
+  auto offset = args;
+  for (auto &param : params_fmt) {
+    switch (param.kind()) {
+    case WasmValueType::I32: {
+      int32_t val = 0;
+      memcpy(&val, memory.data(caller.context()).data() + offset, sizeof(int32_t));
+      offset += sizeof(int32_t);
+      RAY_LOG(DEBUG) << "push arg: " << val;
+      task.PushOneArgument(val);
+    } break;
+    case WasmValueType::I64: {
+      int64_t val = 0;
+      memcpy(&val, memory.data(caller.context()).data() + offset, sizeof(int64_t));
+      offset += sizeof(int64_t);
+      RAY_LOG(DEBUG) << "push arg: " << val;
+      task.PushOneArgument(val);
+    } break;
+    case WasmValueType::F32: {
+      float val;
+      memcpy(&val, memory.data(caller.context()).data() + offset, sizeof(float));
+      offset += sizeof(float);
+      RAY_LOG(DEBUG) << "push arg: " << val;
+      task.PushOneArgument(val);
+    } break;
+    case WasmValueType::F64: {
+      double val;
+      memcpy(&val, memory.data(caller.context()).data() + offset, sizeof(double));
+      offset += sizeof(double);
+      RAY_LOG(DEBUG) << "push arg: " << val;
+      task.PushOneArgument(val);
+    } break;
+    default:
+      RAY_LOG(DEBUG) << "unsupported parameter type: " << param.kind();
+      return 0;
+    }
+  }
+
+  auto result = task.Remote();
+  // TODO(wilson.wang): we need to deal with async/sync call cases
+
+  // TODO(wilson.wang): we need to deal with multiple results
+
+  // get a random int32
+  srand(time(NULL));
+  uint32_t resid = rand();
+
+  objref_map[resid] = result.ID();
+  char tmp[256];
+  tmp[0] = '\0';
+  for (uint8_t b : result.ID()) {
+    snprintf(tmp, 256, "%s%02x", tmp, b);
+  }
+  RAY_LOG(DEBUG) << "objref_map[" << resid << "] = " << tmp;
+  {
+    // temporary code to get result
+    int32_t resval = *(ray::Get(result));
+    RAY_LOG(DEBUG) << "remote call result: " << resval;
+  }
+  return resid;
+}
+
 static void register_ray_handlers(WasmLinker &linker) {
   unwrap(linker.func_new(
       "ray", "get", WasmFunctionType({WasmValueType::I32}, {}), [
@@ -96,40 +169,41 @@ static void register_ray_handlers(WasmLinker &linker) {
       ](auto caller, auto params, auto results) -> auto{ return monostate(); }));
 
   unwrap(linker.func_wrap(
-      "ray", "call", [](WasmCaller caller, int32_t funcref_idx, int32_t args) -> auto{
+      "ray",
+      "call",
+      [](WasmCaller caller, int32_t funcref_idx, int32_t args) -> uint32_t {
         auto tbl = caller.get_export(WASMFUNC_TBL_NAME);
         if (!holds_alternative<WasmTable>(*tbl)) {
-          cerr << "cannot get function table: " << WASMFUNC_TBL_NAME << endl;
-          return monostate();
+          RAY_LOG(ERROR) << "cannot get function table: " << WASMFUNC_TBL_NAME;
+          return 0;
         }
 
         auto table = get<WasmTable>(*tbl);
         auto val = table.get(caller.context(), funcref_idx);
         if (val->kind() != ValKind::FuncRef) {
-          cerr << "cannot get function ref: " << funcref_idx << endl;
-          return monostate();
+          RAY_LOG(ERROR) << "cannot get function ref: " << funcref_idx;
+          return 0;
         }
 
         optional<WasmFunction> func = val->funcref();
         if (!func) {
-          cerr << "cannot get function: " << funcref_idx << endl;
-          return monostate();
+          RAY_LOG(ERROR) << "cannot get function: " << funcref_idx;
+          return 0;
         }
 
         // print all parameters
         auto func_type = func->type(caller.context());
-        auto params = func_type->params();
-        auto results = func_type->results();
-#ifdef RAYWA_DEBUG
-        cerr << "function: " << funcref_idx << " params: " << params.size()
-             << " results: " << results.size() << endl;
-#endif
+        auto params_fmt = func_type->params();
+        auto results_fmt = func_type->results();
+        if (results_fmt.size() > 1) {
+          RAY_LOG(ERROR) << "unsupported results size: " << results_fmt.size();
+          return 0;
+        }
+        RAY_LOG(DEBUG) << "function: " << funcref_idx << " params: " << params_fmt.size()
+                       << " results: " << results_fmt.size();
         // calculate bytes used by parameters
         size_t params_bytes = 0;
-        for (auto &param : params) {
-#ifdef RAYWA_DEBUG
-          cerr << "param: " << param.kind() << endl;
-#endif
+        for (auto &param : params_fmt) {
           switch (param.kind()) {
           case WasmValueType::I32:
             params_bytes += sizeof(int32_t);
@@ -144,52 +218,71 @@ static void register_ray_handlers(WasmLinker &linker) {
             params_bytes += sizeof(double);
             break;
           default:
-            cerr << "unsupported parameter type: " << param.kind() << endl;
-            return monostate();
+            RAY_LOG(DEBUG) << "unsupported parameter type: " << param.kind();
+            return 0;
           }
         }
 
+        // get exported memory
         optional<Extern> export_memory = caller.get_export("memory");
         if (!export_memory) {
-          cerr << "cannot get memory" << endl;
-          return monostate();
+          RAY_LOG(ERROR) << "cannot get memory";
+          return 0;
         }
         if (!holds_alternative<WasmMemory>(*export_memory)) {
-          cerr << "memory not found" << endl;
-          return monostate();
+          RAY_LOG(ERROR) << "memory not found";
+          return 0;
         }
 
+        // get actual memory object
         auto memory = get<WasmMemory>(*caller.get_export("memory"));
         if (memory.data_size(caller.context()) <= args) {
-          cerr << "data address out of range: 0x" << hex << args << endl;
-          return monostate();
+          RAY_LOG(ERROR) << "data address out of range: 0x" << hex << args;
+          return 0;
         }
 
         // make sure the parameter size is within the memory range
         if (memory.data_size(caller.context()) < args + params_bytes) {
-          cerr << "data address out of range: 0x" << hex << args << " + " << params_bytes
-               << endl;
-          return monostate();
+          RAY_LOG(ERROR) << "data address out of range: 0x" << hex << args << " + "
+                         << params_bytes;
+          return 0;
         }
 
-#ifdef RAYWA_DEBUG
-        cerr << "memory size: 0x" << hex << memory.data_size(caller.context()) << endl;
+        RAY_LOG(DEBUG) << "memory size: 0x" << hex << memory.data_size(caller.context());
         print_hex(memory.data(caller.context()).data(), args, params_bytes);
-#endif
 
-#ifdef RAYWA_DEBUG
-        cerr << "create remote function: 0x" << hex << funcref_idx << " args 0x" << args
-             << endl;
-#endif
-        int (*fp)() = (int (*)())(0L + funcref_idx);  // TODO fix this hack
-        ray::internal::RegisterRemoteFunctions(to_string(funcref_idx), fp);
-        // auto object = ray::Task(fp).Remote();  // TODO args
-        // auto result = ray::Get(object);
-        ray::Task(fp).Remote();
-        // sleep for 5 second to wait for the result
-        sleep(5);
+        RAY_LOG(DEBUG) << "create remote function: 0x" << hex << funcref_idx << " args 0x"
+                       << args;
 
-        return monostate();
+        // iterate result format
+        for (auto &result : results_fmt) {
+          switch (result.kind()) {
+          case WasmValueType::I32: {
+            int32_t (*fp)() = (int32_t(*)())(0L + funcref_idx);
+            return launch_remote<int32_t>(
+                params_fmt, fp, funcref_idx, args, memory, caller);
+          } break;
+          case WasmValueType::I64: {
+            int64_t (*fp64)() = (int64_t(*)())(0L + funcref_idx);
+            return launch_remote<int64_t>(
+                params_fmt, fp64, funcref_idx, args, memory, caller);
+          } break;
+          case WasmValueType::F32: {
+            float (*fp32)() = (float (*)())(0L + funcref_idx);
+            return launch_remote<float>(
+                params_fmt, fp32, funcref_idx, args, memory, caller);
+          } break;
+          case WasmValueType::F64: {
+            double (*fp64d)() = (double (*)())(0L + funcref_idx);
+            return launch_remote<double>(
+                params_fmt, fp64d, funcref_idx, args, memory, caller);
+          } break;
+          default:
+            RAY_LOG(DEBUG) << "unsupported result type: " << result.kind();
+            return 0;
+          }
+        }
+        return 0;
       }));
 }
 
@@ -219,20 +312,18 @@ optional<WasmFunction> function_from_exports(WasmInstance &instance,
                                              const char *func_name) {
   optional<Extern> export_func;
   if (!(export_func = instance.get(store, func_name))) {
-    cerr << "cannot get function: " << func_name << endl;
+    RAY_LOG(DEBUG) << "cannot get function: " << func_name;
     return nullopt;
   }
 
   // check variant type
   if (!holds_alternative<WasmFunction>(*export_func)) {
-    cerr << "function " << func_name << " not found" << endl;
+    RAY_LOG(DEBUG) << "function " << func_name << " not found";
     return nullopt;
   }
 
   auto func = get<WasmFunction>(*export_func);
-#ifdef RAYWA_DEBUG
-  cerr << "found function: \"" << func_name << "\"" << endl;
-#endif
+  RAY_LOG(DEBUG) << "found function: \"" << func_name << "\"";
   return optional<WasmFunction>(func);
 }
 
@@ -242,20 +333,18 @@ optional<WasmTable> table_from_exports(WasmInstance &instance,
                                        const char *tbl_name) {
   optional<Extern> export_tbl;
   if (!(export_tbl = instance.get(store, tbl_name))) {
-    cerr << "cannot get table: " << tbl_name << endl;
+    RAY_LOG(DEBUG) << "cannot get table: " << tbl_name;
     return nullopt;
   }
 
   // check variant type
   if (!holds_alternative<WasmTable>(*export_tbl)) {
-    cerr << "table " << tbl_name << " not found" << endl;
+    RAY_LOG(DEBUG) << "table " << tbl_name << " not found";
     return nullopt;
   }
 
   auto table = get<WasmTable>(*export_tbl);
-#ifdef RAYWA_DEBUG
-  cerr << "table \"" << tbl_name << "\" size = " << table.size(store) << endl;
-#endif
+  RAY_LOG(DEBUG) << "table \"" << tbl_name << "\" size = " << table.size(store);
   return optional<WasmTable>(table);
 }
 
@@ -265,22 +354,20 @@ optional<WasmFunction> function_from_exports(WasmInstance &instance,
                                              int index) {
   auto tmp = instance.get(store, index);
   if (!tmp) {
-    cerr << "cannot get export " << index << endl;
+    RAY_LOG(DEBUG) << "cannot get export " << index;
     return nullopt;
   }
   auto name = get<string_view>(*tmp);
   auto ext = get<Extern>(*tmp);
   if (!holds_alternative<WasmFunction>(ext)) {
-    cerr << "export " << index << " is not a function" << endl;
+    RAY_LOG(DEBUG) << "export " << index << " is not a function";
     return nullopt;
   }
   auto func = get<WasmFunction>(ext);
 
-#ifdef RAYWA_DEBUG
-  cerr << "found function " << name << " at export index " << index
-       << ". store_id: " << func.raw_func().store_id
-       << " func index: " << func.raw_func().index << endl;
-#endif
+  RAY_LOG(DEBUG) << "found function " << name << " at export index " << index
+                 << ". store_id: " << func.raw_func().store_id
+                 << " func index: " << func.raw_func().index;
   return func;
 }
 
@@ -291,18 +378,18 @@ optional<WasmFunction> function_from_table(WasmInstance &instance,
                                            int index) {
   optional<WasmValue> val;
   if (!(val = table.get(store, index))) {
-    cerr << "cannot get function at index " << index << endl;
+    RAY_LOG(DEBUG) << "cannot get function at index " << index;
     return nullopt;
   }
 
   if (val->kind() != ValKind::FuncRef) {
-    cerr << "value at index " << index << " is not function" << endl;
+    RAY_LOG(DEBUG) << "value at index " << index << " is not function";
     return nullopt;
   }
 
   optional<WasmFunction> func = val->funcref();
   if (!func) {
-    cout << "function at index " << index << " not found" << endl;
+    cout << "function at index " << index << " not found";
     return nullopt;
   }
 
@@ -316,7 +403,7 @@ optional<WasmFunction> function_from_table(WasmInstance &instance,
                                            int index) {
   auto table = table_from_exports(instance, store, table_name);
   if (!table) {
-    cerr << "cannot get table: " << table_name << endl;
+    RAY_LOG(DEBUG) << "cannot get table: " << table_name;
     return nullopt;
   }
 
@@ -330,15 +417,13 @@ void call_function_by_name(WasmInstance &instance,
                            vector<WasmValue> args) {
   auto func = function_from_exports(instance, store, func_name);
   if (!func) {
-    cerr << "function " << func_name << " not found" << endl;
+    RAY_LOG(DEBUG) << "function " << func_name << " not found";
     return;
   }
 
   auto raw = function_raw_pointer(store, *func);
-#ifdef RAYWA_DEBUG
-  cerr << "calling function \"" << func_name << "\" ";
-  cerr << "raw pointer: 0x" << hex << raw << endl;
-#endif
+  RAY_LOG(DEBUG) << "calling function \"" << func_name << "\" ";
+  RAY_LOG(DEBUG) << "raw pointer: 0x" << hex << raw;
 
   func->call(store, args).unwrap();
 }

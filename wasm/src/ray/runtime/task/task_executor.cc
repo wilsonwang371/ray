@@ -86,22 +86,122 @@ std::pair<Status, std::shared_ptr<msgpack::sbuffer>> GetExecuteResult(
     msgpack::sbuffer *actor_ptr) {
   try {
     wasmtime_func_t tmp;
-    WasmFunction entry_function(tmp);
+    WasmFunction entryfunc(tmp);
     if (actor_ptr == nullptr) {
-      entry_function = FunctionHelper::GetInstance().GetWasmFunctions(func_name);
+      entryfunc = FunctionHelper::GetInstance().GetWasmFunctions(func_name);
     } 
     // else {
-    //   entry_function =
+    //   entryfunc =
     //       FunctionHelper::GetInstance().GetExecutableMemberFunctions(func_name);
     // }
     RAY_LOG(DEBUG) << "Get executable function " << func_name << " ok.";
-    vector<WasmValue> args = {2, 3};
-    entry_function.call(*FunctionHelper::GetInstance().wasm_store_, args).unwrap();
-    // auto result = entry_function(func_name, args_buffer, actor_ptr);
+
+    vector<WasmValue> args;
+    auto entryfunc_type = entryfunc.type(*FunctionHelper::GetInstance().wasm_store_);
+    if (entryfunc_type->params().size() != args_buffer.size()) {
+      RAY_LOG(ERROR) << "The number of arguments is not equal to the number of parameters.";
+      return std::make_pair(ray::Status::Invalid("The number of arguments is not equal to the number of parameters."), nullptr);
+    }
+
+    // iterate the params
+    int i = 0;
+    for (auto param : entryfunc_type->params()) {
+      RAY_LOG(DEBUG) << "param type: " << param.kind();
+      // print args_buffer info
+      RAY_LOG(DEBUG) << "args_buffer[" << i << "].size: " << args_buffer[i].size();
+
+      switch (param.kind()) {
+        case WasmValueType::I32:
+          {
+            auto tmp = Serializer::Deserialize<int32_t>(args_buffer[i].data(), args_buffer[i].size());
+            RAY_LOG(DEBUG) << "get argument: " << tmp;
+            args.push_back(tmp);
+          }
+          break;
+        case WasmValueType::I64:
+          {
+            auto tmp = Serializer::Deserialize<int64_t>(args_buffer[i].data(), args_buffer[i].size());
+            RAY_LOG(DEBUG) << "get argument: " << tmp;
+            args.push_back(tmp);
+          }
+          break;
+        case WasmValueType::F32:
+          {
+            auto tmp = Serializer::Deserialize<float>(args_buffer[i].data(), args_buffer[i].size());
+            RAY_LOG(DEBUG) << "get argument: " << tmp;
+            args.push_back(tmp);
+          }
+          break;
+        case WasmValueType::F64:
+          {
+            auto tmp = Serializer::Deserialize<double>(args_buffer[i].data(), args_buffer[i].size());
+            RAY_LOG(DEBUG) << "get argument: " << tmp;
+            args.push_back(tmp);
+          }
+          break;
+        case WasmValueType::V128:
+        case WasmValueType::ExternRef:
+        case WasmValueType::FuncRef:
+        default:
+          RAY_LOG(ERROR) << "Unsupported param type: " << param.kind();
+          return std::make_pair(ray::Status::Invalid("Unsupported param type."), nullptr);
+      }
+      i++;
+    }
+
+    std::vector<WasmValue> resultvec = entryfunc.call(*FunctionHelper::GetInstance().wasm_store_, args).unwrap();
+    
     RAY_LOG(DEBUG) << "Execute function " << func_name << " ok.";
-    return std::make_pair(ray::Status::IntentionalSystemExit(""), nullptr);
-    // return std::make_pair(ray::Status::OK(),
-    //                       std::make_shared<msgpack::sbuffer>(std::move(nullptr)));
+
+    if (resultvec.size() > 1) {
+      RAY_LOG(ERROR) << "The number of return values should not be more than 1.";
+      return std::make_pair(ray::Status::Invalid("The number of return values should not be more than 1."), nullptr);
+    }
+    if (resultvec.size() == 0) {
+      return std::make_pair(ray::Status::OK(), nullptr);
+    }
+    WasmValue result = resultvec[0];
+    // check result type
+    switch (result.kind()) {
+      case WasmValueType::I32:
+        {
+          auto tmp = Serializer::Serialize<int32_t>(result.i32());
+          RAY_LOG(DEBUG) << "get result: " << result.i32();
+          return std::make_pair(ray::Status::OK(),
+                                std::make_shared<msgpack::sbuffer>(std::move(tmp)));
+        }
+        break;
+      case WasmValueType::I64:
+        {
+          auto tmp = Serializer::Serialize<int64_t>(result.i64());
+          RAY_LOG(DEBUG) << "get result: " << result.i64();
+          return std::make_pair(ray::Status::OK(),
+                                std::make_shared<msgpack::sbuffer>(std::move(tmp)));
+        }
+        break;
+      case WasmValueType::F32:
+        {
+          auto tmp = Serializer::Serialize<float>(result.f32());
+          RAY_LOG(DEBUG) << "get result: " << result.f32();
+          return std::make_pair(ray::Status::OK(),
+                                std::make_shared<msgpack::sbuffer>(std::move(tmp)));
+        }
+        break;
+      case WasmValueType::F64:
+        {
+          auto tmp = Serializer::Serialize<double>(result.f64());
+          RAY_LOG(DEBUG) << "get result: " << result.f64();
+          return std::make_pair(ray::Status::OK(),
+                                std::make_shared<msgpack::sbuffer>(std::move(tmp)));
+        }
+        break;
+      case WasmValueType::V128:
+      case WasmValueType::ExternRef:
+      case WasmValueType::FuncRef:
+      default:
+        RAY_LOG(ERROR) << "Unsupported result type: " << result.kind();
+        return std::make_pair(ray::Status::Invalid("Unsupported result type."), nullptr);
+    }
   } catch (RayIntentionalSystemExitException &e) {
     RAY_LOG(ERROR) << "Ray intentional system exit while executing function(" << func_name
                    << ").";

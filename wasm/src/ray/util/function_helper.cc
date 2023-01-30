@@ -104,7 +104,6 @@ void FunctionHelper::LoadWasm(const std::filesystem::path &lib_path) {
     return;
   }
 
-  RAY_LOG(INFO) << "Here2";
   auto table = table_from_exports(*instance, *wasm_store_, WASMFUNC_TBL_NAME);
   if (!table) {
     cerr << "cannot get table: " << WASMFUNC_TBL_NAME << endl;
@@ -121,11 +120,6 @@ void FunctionHelper::LoadWasm(const std::filesystem::path &lib_path) {
       continue;
     }
 
-    if (i == 1) {
-      cerr << "calling function at index " << i << endl;
-      unwrap(func->call(*wasm_store_, {1, 3}));
-    }
-
     // get the function type
     WasmFunctionType func_type = func->type(*wasm_store_);
 
@@ -133,25 +127,12 @@ void FunctionHelper::LoadWasm(const std::filesystem::path &lib_path) {
     snprintf(func_name, sizeof(func_name), "%d", i);
     wasm_funcs_.emplace(string(func_name), *func);
 
-#ifdef RAYWA_DEBUG
     size_t raw = function_raw_pointer(*wasm_store_, *func);
-    cerr << "function raw pointer: 0x" << hex << raw << ", ";
-    cerr << "table: " << WASMFUNC_TBL_NAME << " idx: " << i << ", ["
-          << func_type->params().size() << "] -> " << func_type->results().size()
-          << ", store id: " << func->raw_func().store_id
-          << ", idx: " << func->raw_func().index << endl;
-#endif
-
-    // for (int j = 0; j < 1000; j++) {
-    //   auto func_inner = function_from_exports(instance, store, j);
-    //   if (!func_inner) {
-    //     break;
-    //   }
-    //   if (func_inner->raw_func().store_id == func->raw_func().store_id &&
-    //       func_inner->raw_func().index == func->raw_func().index) {
-    //     cout << "found!! " << endl;
-    //   }
-    // }
+    RAY_LOG(DEBUG) << "function raw pointer: 0x" << hex << raw << ", ";
+    RAY_LOG(DEBUG) << "table: " << WASMFUNC_TBL_NAME << " idx: " << i << ", ["
+                   << func_type->params().size() << "] -> " << func_type->results().size()
+                   << ", store id: " << func->raw_func().store_id
+                   << ", idx: " << func->raw_func().index;
   }
 }
 

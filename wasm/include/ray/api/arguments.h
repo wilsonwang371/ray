@@ -22,11 +22,63 @@
 #include <msgpack.hpp>
 #include <type_traits>
 
+#include <iostream>
+
 namespace ray {
 namespace internal {
 
 class Arguments {
  public:
+  template <typename InputArgTypes>
+  static void WrapArgsImpl2(LangType lang_type,
+                           std::vector<TaskArg> *task_args,
+                           InputArgTypes &&arg) {
+    if constexpr (is_object_ref_v<InputArgTypes>) {
+      // core_worker submitting task callback will get the value of an ObjectRef arg, but
+      // local mode we don't call core_worker submit task, so we need get the value of an
+      // ObjectRef arg only for local mode.
+      if (RayRuntimeHolder::Instance().Runtime()->IsLocalMode()) {
+        auto buffer = RayRuntimeHolder::Instance().Runtime()->Get(arg.ID());
+        PushValueArg(task_args, std::move(*buffer));
+      } else {
+        PushReferenceArg(task_args, std::forward<InputArgTypes>(arg));
+      }
+    } else {
+      if (lang_type == LangType::CPP || lang_type == LangType::WASM) {
+        if constexpr (is_actor_handle_v<InputArgTypes>) {
+          auto serialized_actor_handle =
+              RayRuntimeHolder::Instance().Runtime()->SerializeActorHandle(arg.ID());
+          msgpack::sbuffer buffer = Serializer::Serialize(serialized_actor_handle);
+          PushValueArg(task_args, std::move(buffer));
+        } else {
+          msgpack::sbuffer buffer =
+              Serializer::Serialize(std::forward<InputArgTypes>(arg));
+          std::cerr << "buffer.size() = " << buffer.size() << std::endl;
+          PushValueArg(task_args, std::move(buffer));
+        }
+      } else {
+        // Fill dummy field for handling kwargs.
+        if (lang_type == LangType::PYTHON) {
+          msgpack::sbuffer dummy_buf(METADATA_STR_DUMMY.size());
+          dummy_buf.write(METADATA_STR_DUMMY.data(), METADATA_STR_DUMMY.size());
+          PushValueArg(task_args, std::move(dummy_buf), METADATA_STR_RAW);
+        }
+        // Below applies to both PYTHON and JAVA.
+        auto data_buf = Serializer::Serialize(std::forward<InputArgTypes>(arg));
+        auto len_buf = Serializer::Serialize(data_buf.size());
+
+        msgpack::sbuffer buffer(XLANG_HEADER_LEN + data_buf.size());
+        buffer.write(len_buf.data(), len_buf.size());
+        for (size_t i = 0; i < XLANG_HEADER_LEN - len_buf.size(); ++i) {
+          buffer.write("", 1);
+        }
+        buffer.write(data_buf.data(), data_buf.size());
+
+        PushValueArg(task_args, std::move(buffer), METADATA_STR_XLANG);
+      }
+    }
+  }
+
   template <typename OriginArgType, typename InputArgTypes>
   static void WrapArgsImpl(LangType lang_type,
                            std::vector<TaskArg> *task_args,
