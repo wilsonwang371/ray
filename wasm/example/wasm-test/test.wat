@@ -23,9 +23,6 @@
   (type (;21;) (func (param i32 i32 i32)))
   (type (;22;) (func (param i32 i32 i32 i32 i32)))
   (type (;23;) (func (param f64 i32) (result f64)))
-  (type (;24;) (func (param i32 i64 i64 i64 i64 i32)))
-  (type (;25;) (func (param i32 i64 i64 i64 i64)))
-  (type (;26;) (func (param i32 i64 i64 i32)))
   (import "ray" "call" (func $rcall (type 2)))
   (import "wasi_snapshot_preview1" "args_get" (func $__imported_wasi_snapshot_preview1_args_get (type 2)))
   (import "wasi_snapshot_preview1" "args_sizes_get" (func $__imported_wasi_snapshot_preview1_args_sizes_get (type 2)))
@@ -108,7 +105,7 @@
     i32.const 0
     local.set 6
     local.get 6
-    i32.load offset=1340
+    i32.load offset=1336
     local.set 7
     local.get 5
     i32.load offset=28
@@ -167,7 +164,7 @@
     i32.const 0
     local.set 0
     local.get 0
-    i32.load offset=1340
+    i32.load offset=1336
     local.set 1
     i32.const 1078
     local.set 2
@@ -180,7 +177,7 @@
     drop
     return)
   (func $__original_main (type 17) (result i32)
-    (local i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32)
+    (local i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32)
     global.get $__stack_pointer
     local.set 0
     i32.const 48
@@ -199,7 +196,7 @@
     i32.const 0
     local.set 4
     local.get 4
-    i32.load offset=1340
+    i32.load offset=1336
     local.set 5
     i32.const 1
     local.set 6
@@ -243,7 +240,7 @@
     i32.const 0
     local.set 14
     local.get 14
-    i32.load offset=1340
+    i32.load offset=1336
     local.set 15
     i32.const 2
     local.set 16
@@ -271,22 +268,17 @@
     local.get 21
     call $rcall
     drop
-    i32.const 5
-    local.set 22
-    local.get 22
-    call $sleep
-    drop
     i32.const 0
-    local.set 23
+    local.set 22
     i32.const 48
-    local.set 24
+    local.set 23
     local.get 2
-    local.get 24
-    i32.add
-    local.set 25
-    local.get 25
-    global.set $__stack_pointer
     local.get 23
+    i32.add
+    local.set 24
+    local.get 24
+    global.set $__stack_pointer
+    local.get 22
     return)
   (func $main (type 2) (param i32 i32) (result i32)
     (local i32)
@@ -294,207 +286,6 @@
     local.set 2
     local.get 2
     return)
-  (func $sleep (type 6) (param i32) (result i32)
-    (local i32 i32)
-    global.get $__stack_pointer
-    i32.const 16
-    i32.sub
-    local.tee 1
-    global.set $__stack_pointer
-    local.get 1
-    i32.const 0
-    i32.store offset=8
-    local.get 1
-    local.get 0
-    i64.extend_i32_u
-    i64.store
-    i32.const 1336
-    i32.const 0
-    local.get 1
-    i32.const 0
-    call $clock_nanosleep
-    local.set 2
-    local.get 1
-    i32.const 16
-    i32.add
-    global.set $__stack_pointer
-    local.get 0
-    i32.const 0
-    local.get 2
-    select)
-  (func $clock_nanosleep (type 9) (param i32 i32 i32 i32) (result i32)
-    (local i32 i32 i64 i32 i64 i64 i64)
-    global.get $__stack_pointer
-    i32.const 112
-    i32.sub
-    local.tee 4
-    global.set $__stack_pointer
-    i32.const 28
-    local.set 5
-    block  ;; label = @1
-      local.get 1
-      i32.const 1
-      i32.gt_u
-      br_if 0 (;@1;)
-      i64.const 0
-      local.set 6
-      local.get 4
-      i32.const 104
-      i32.add
-      local.tee 5
-      i64.const 0
-      i64.store
-      local.get 4
-      i32.const 80
-      i32.add
-      local.tee 7
-      i64.const 0
-      i64.store
-      local.get 4
-      i32.const 96
-      i32.add
-      i64.const 0
-      i64.store
-      local.get 4
-      i32.const 88
-      i32.add
-      i64.const 0
-      i64.store
-      local.get 4
-      i32.const 72
-      i32.add
-      i64.const 0
-      i64.store
-      local.get 5
-      local.get 1
-      i32.store16
-      local.get 7
-      local.get 0
-      i32.load
-      i32.store
-      local.get 4
-      i64.const 0
-      i64.store offset=64
-      i32.const 28
-      local.set 5
-      local.get 2
-      i32.load offset=8
-      local.tee 1
-      i32.const 999999999
-      i32.gt_u
-      br_if 0 (;@1;)
-      block  ;; label = @2
-        block  ;; label = @3
-          local.get 2
-          i64.load
-          local.tee 8
-          i64.const 0
-          i64.lt_s
-          br_if 0 (;@3;)
-          local.get 4
-          i32.const 0
-          i32.store offset=20
-          local.get 4
-          local.get 8
-          i64.const 0
-          i64.const 1000000000
-          i64.const 0
-          local.get 4
-          i32.const 20
-          i32.add
-          call $__muloti4
-          i64.const -1
-          local.set 6
-          i64.const 0
-          local.get 4
-          i32.const 8
-          i32.add
-          i64.load
-          local.tee 9
-          i64.const 1
-          i64.and
-          local.tee 8
-          i64.sub
-          local.get 9
-          i64.xor
-          i64.const 0
-          i64.ne
-          local.get 4
-          i32.load offset=20
-          i32.const 0
-          i32.ne
-          i32.or
-          br_if 0 (;@3;)
-          local.get 4
-          i64.load
-          local.tee 10
-          local.get 10
-          i64.const -512
-          i64.and
-          i64.xor
-          local.get 8
-          i64.or
-          i64.const 0
-          i64.ne
-          br_if 0 (;@3;)
-          i64.const 0
-          local.get 10
-          local.get 1
-          i64.extend_i32_u
-          i64.add
-          local.tee 8
-          local.get 10
-          i64.lt_u
-          i64.extend_i32_u
-          local.get 9
-          i64.const 1
-          i64.and
-          i64.sub
-          local.tee 9
-          i64.const 1
-          i64.and
-          i64.sub
-          local.tee 10
-          local.get 9
-          i64.xor
-          i64.const 0
-          i64.ne
-          br_if 0 (;@3;)
-          local.get 10
-          i64.const -1
-          i64.gt_s
-          br_if 1 (;@2;)
-        end
-        local.get 6
-        local.set 8
-      end
-      local.get 4
-      local.get 8
-      i64.store offset=88
-      i32.const 58
-      i32.const 0
-      local.get 4
-      i32.const 64
-      i32.add
-      local.get 4
-      i32.const 24
-      i32.add
-      i32.const 1
-      local.get 4
-      i32.const 60
-      i32.add
-      call $__wasi_poll_oneoff
-      local.get 4
-      i32.load16_u offset=32
-      i32.or
-      select
-      local.set 5
-    end
-    local.get 4
-    i32.const 112
-    i32.add
-    global.set $__stack_pointer
-    local.get 5)
   (func $__wasi_args_get (type 2) (param i32 i32) (result i32)
     local.get 0
     local.get 1
@@ -1643,7 +1434,7 @@
     i32.const 2896
     i32.add
     i32.load16_u
-    i32.const 1344
+    i32.const 1340
     i32.add
     local.get 1
     i32.load offset=20
@@ -1672,7 +1463,7 @@
     i32.const 2896
     i32.add
     i32.load16_u
-    i32.const 1344
+    i32.const 1340
     i32.add
     local.get 1
     i32.load offset=20
@@ -8171,843 +7962,27 @@
       local.set 0
     end
     local.get 0)
-  (func $__muloti4 (type 24) (param i32 i64 i64 i64 i64 i32)
-    (local i32 i64 i64 i64 i64 i64 i64)
-    global.get $__stack_pointer
-    i32.const 48
-    i32.sub
-    local.tee 6
-    global.set $__stack_pointer
-    local.get 5
-    i32.const 0
-    i32.store
-    block  ;; label = @1
-      block  ;; label = @2
-        block  ;; label = @3
-          local.get 1
-          local.get 2
-          i64.const -9223372036854775808
-          i64.xor
-          i64.or
-          i64.const 0
-          i64.ne
-          br_if 0 (;@3;)
-          local.get 3
-          i64.const 2
-          i64.lt_u
-          i32.const 0
-          local.get 4
-          i64.eqz
-          select
-          i32.eqz
-          br_if 1 (;@2;)
-          br 2 (;@1;)
-        end
-        block  ;; label = @3
-          local.get 3
-          local.get 4
-          i64.const -9223372036854775808
-          i64.xor
-          i64.or
-          i64.const 0
-          i64.ne
-          br_if 0 (;@3;)
-          local.get 1
-          i64.const 2
-          i64.lt_u
-          i32.const 0
-          local.get 2
-          i64.eqz
-          select
-          i32.eqz
-          br_if 1 (;@2;)
-          br 2 (;@1;)
-        end
-        local.get 2
-        i64.const 63
-        i64.shr_s
-        local.tee 7
-        local.get 1
-        i64.xor
-        local.tee 8
-        local.get 7
-        i64.sub
-        local.tee 9
-        i64.const 2
-        i64.lt_u
-        local.get 7
-        local.get 2
-        i64.xor
-        local.get 7
-        i64.sub
-        local.get 8
-        local.get 7
-        i64.lt_u
-        i64.extend_i32_u
-        i64.sub
-        local.tee 10
-        i64.const 0
-        i64.lt_s
-        local.get 10
-        i64.eqz
-        select
-        br_if 1 (;@1;)
-        local.get 4
-        i64.const 63
-        i64.shr_s
-        local.tee 8
-        local.get 3
-        i64.xor
-        local.tee 11
-        local.get 8
-        i64.sub
-        local.tee 12
-        i64.const 2
-        i64.lt_u
-        local.get 8
-        local.get 4
-        i64.xor
-        local.get 8
-        i64.sub
-        local.get 11
-        local.get 8
-        i64.lt_u
-        i64.extend_i32_u
-        i64.sub
-        local.tee 11
-        i64.const 0
-        i64.lt_s
-        local.get 11
-        i64.eqz
-        select
-        br_if 1 (;@1;)
-        block  ;; label = @3
-          local.get 7
-          local.get 8
-          i64.xor
-          local.tee 7
-          local.get 7
-          i64.or
-          i64.const 0
-          i64.ne
-          br_if 0 (;@3;)
-          local.get 6
-          i32.const 16
-          i32.add
-          i64.const -1
-          i64.const 9223372036854775807
-          local.get 12
-          local.get 11
-          call $__udivti3
-          local.get 9
-          local.get 6
-          i64.load offset=16
-          i64.gt_u
-          local.get 10
-          local.get 6
-          i32.const 24
-          i32.add
-          i64.load
-          local.tee 7
-          i64.gt_s
-          local.get 10
-          local.get 7
-          i64.eq
-          select
-          br_if 1 (;@2;)
-          br 2 (;@1;)
-        end
-        local.get 6
-        i32.const 32
-        i32.add
-        i64.const 0
-        i64.const -9223372036854775808
-        local.get 12
-        local.get 11
-        call $__udivti3
-        local.get 9
-        local.get 6
-        i64.load offset=32
-        i64.le_u
-        local.get 10
-        local.get 6
-        i32.const 40
-        i32.add
-        i64.load
-        local.tee 7
-        i64.le_s
-        local.get 10
-        local.get 7
-        i64.eq
-        select
-        br_if 1 (;@1;)
-      end
-      local.get 5
-      i32.const 1
-      i32.store
-    end
-    local.get 6
-    local.get 3
-    local.get 4
-    local.get 1
-    local.get 2
-    call $__multi3
-    local.get 0
-    local.get 6
-    i32.const 8
-    i32.add
-    i64.load
-    i64.store offset=8
-    local.get 0
-    local.get 6
-    i64.load
-    i64.store
-    local.get 6
-    i32.const 48
-    i32.add
-    global.set $__stack_pointer)
-  (func $__multi3 (type 25) (param i32 i64 i64 i64 i64)
-    (local i64)
-    local.get 0
-    local.get 4
-    local.get 1
-    i64.mul
-    local.get 2
-    local.get 3
-    i64.mul
-    i64.add
-    local.get 3
-    i64.const 32
-    i64.shr_u
-    local.tee 4
-    local.get 1
-    i64.const 32
-    i64.shr_u
-    local.tee 2
-    i64.mul
-    i64.add
-    local.get 3
-    i64.const 4294967295
-    i64.and
-    local.tee 3
-    local.get 1
-    i64.const 4294967295
-    i64.and
-    local.tee 1
-    i64.mul
-    local.tee 5
-    i64.const 32
-    i64.shr_u
-    local.get 3
-    local.get 2
-    i64.mul
-    i64.add
-    local.tee 3
-    i64.const 32
-    i64.shr_u
-    i64.add
-    local.get 3
-    i64.const 4294967295
-    i64.and
-    local.get 4
-    local.get 1
-    i64.mul
-    i64.add
-    local.tee 3
-    i64.const 32
-    i64.shr_u
-    i64.add
-    i64.store offset=8
-    local.get 0
-    local.get 3
-    i64.const 32
-    i64.shl
-    local.get 5
-    i64.const 4294967295
-    i64.and
-    i64.or
-    i64.store)
-  (func $__ashlti3 (type 26) (param i32 i64 i64 i32)
-    (local i64)
-    block  ;; label = @1
-      block  ;; label = @2
-        local.get 3
-        i32.const 64
-        i32.and
-        i32.eqz
-        br_if 0 (;@2;)
-        local.get 1
-        local.get 3
-        i32.const -64
-        i32.add
-        i64.extend_i32_u
-        i64.shl
-        local.set 2
-        i64.const 0
-        local.set 1
-        br 1 (;@1;)
-      end
-      local.get 3
-      i32.eqz
-      br_if 0 (;@1;)
-      local.get 1
-      i32.const 64
-      local.get 3
-      i32.sub
-      i64.extend_i32_u
-      i64.shr_u
-      local.get 2
-      local.get 3
-      i64.extend_i32_u
-      local.tee 4
-      i64.shl
-      i64.or
-      local.set 2
-      local.get 1
-      local.get 4
-      i64.shl
-      local.set 1
-    end
-    local.get 0
-    local.get 1
-    i64.store
-    local.get 0
-    local.get 2
-    i64.store offset=8)
-  (func $__udivmodti4 (type 24) (param i32 i64 i64 i64 i64 i32)
-    (local i32 i64 i64 i64 i64 i64 i64 i32)
-    global.get $__stack_pointer
-    i32.const 16
-    i32.sub
-    local.tee 6
-    global.set $__stack_pointer
-    block  ;; label = @1
-      block  ;; label = @2
-        block  ;; label = @3
-          local.get 3
-          local.get 1
-          i64.le_u
-          local.get 4
-          local.get 2
-          i64.le_u
-          local.get 4
-          local.get 2
-          i64.eq
-          select
-          br_if 0 (;@3;)
-          block  ;; label = @4
-            local.get 5
-            br_if 0 (;@4;)
-            i64.const 0
-            local.set 7
-            br 2 (;@2;)
-          end
-          local.get 5
-          local.get 1
-          i64.store
-          local.get 5
-          local.get 2
-          i64.store offset=8
-          i64.const 0
-          local.set 7
-          br 1 (;@2;)
-        end
-        i64.const 0
-        local.set 7
-        block  ;; label = @3
-          local.get 4
-          i64.const 0
-          i64.ne
-          br_if 0 (;@3;)
-          block  ;; label = @4
-            block  ;; label = @5
-              local.get 2
-              local.get 3
-              i64.ge_u
-              br_if 0 (;@5;)
-              block  ;; label = @6
-                local.get 3
-                i64.clz
-                local.tee 8
-                i64.eqz
-                br_if 0 (;@6;)
-                local.get 2
-                local.get 8
-                i64.shl
-                local.get 1
-                i64.const 1
-                i64.shr_u
-                local.get 8
-                i64.const -1
-                i64.xor
-                i64.shr_u
-                i64.or
-                local.set 2
-                local.get 1
-                local.get 8
-                i64.shl
-                local.set 1
-                local.get 3
-                local.get 8
-                i64.shl
-                local.set 3
-              end
-              local.get 2
-              local.get 2
-              local.get 3
-              i64.const 32
-              i64.shr_u
-              local.tee 9
-              i64.div_u
-              local.tee 4
-              local.get 9
-              i64.mul
-              i64.sub
-              local.set 10
-              local.get 1
-              i64.const 4294967295
-              i64.and
-              local.set 11
-              local.get 1
-              i64.const 32
-              i64.shr_u
-              local.set 1
-              local.get 3
-              i64.const 4294967295
-              i64.and
-              local.set 7
-              block  ;; label = @6
-                loop  ;; label = @7
-                  block  ;; label = @8
-                    local.get 4
-                    i64.const 4294967295
-                    i64.gt_u
-                    br_if 0 (;@8;)
-                    local.get 4
-                    local.get 7
-                    i64.mul
-                    local.get 10
-                    i64.const 32
-                    i64.shl
-                    local.get 1
-                    i64.or
-                    i64.le_u
-                    br_if 2 (;@6;)
-                  end
-                  local.get 4
-                  i64.const -1
-                  i64.add
-                  local.set 4
-                  local.get 10
-                  local.get 9
-                  i64.add
-                  local.tee 10
-                  i64.const 4294967296
-                  i64.lt_u
-                  br_if 0 (;@7;)
-                end
-              end
-              local.get 1
-              local.get 2
-              i64.const 32
-              i64.shl
-              i64.or
-              local.get 4
-              local.get 3
-              i64.mul
-              i64.sub
-              local.tee 2
-              local.get 2
-              local.get 9
-              i64.div_u
-              local.tee 10
-              local.get 9
-              i64.mul
-              i64.sub
-              local.set 1
-              block  ;; label = @6
-                loop  ;; label = @7
-                  block  ;; label = @8
-                    local.get 10
-                    i64.const 4294967295
-                    i64.gt_u
-                    br_if 0 (;@8;)
-                    local.get 10
-                    local.get 7
-                    i64.mul
-                    local.get 1
-                    i64.const 32
-                    i64.shl
-                    local.get 11
-                    i64.or
-                    i64.le_u
-                    br_if 2 (;@6;)
-                  end
-                  local.get 10
-                  i64.const -1
-                  i64.add
-                  local.set 10
-                  local.get 1
-                  local.get 9
-                  i64.add
-                  local.tee 1
-                  i64.const 4294967296
-                  i64.lt_u
-                  br_if 0 (;@7;)
-                end
-              end
-              local.get 2
-              i64.const 32
-              i64.shl
-              local.get 11
-              i64.or
-              local.get 10
-              local.get 3
-              i64.mul
-              i64.sub
-              local.get 8
-              i64.shr_u
-              local.set 1
-              i64.const 0
-              local.set 11
-              br 1 (;@4;)
-            end
-            local.get 2
-            local.get 2
-            local.get 3
-            i64.div_u
-            local.tee 11
-            local.get 3
-            i64.mul
-            i64.sub
-            local.set 8
-            block  ;; label = @5
-              local.get 3
-              i64.clz
-              local.tee 12
-              i64.eqz
-              br_if 0 (;@5;)
-              local.get 8
-              local.get 12
-              i64.shl
-              local.get 1
-              i64.const 64
-              local.get 12
-              i64.sub
-              i64.shr_u
-              i64.or
-              local.set 8
-              local.get 1
-              local.get 12
-              i64.shl
-              local.set 1
-              local.get 3
-              local.get 12
-              i64.shl
-              local.set 3
-            end
-            local.get 8
-            local.get 8
-            local.get 3
-            i64.const 32
-            i64.shr_u
-            local.tee 2
-            i64.div_u
-            local.tee 4
-            local.get 2
-            i64.mul
-            i64.sub
-            local.set 10
-            local.get 1
-            i64.const 4294967295
-            i64.and
-            local.set 7
-            local.get 1
-            i64.const 32
-            i64.shr_u
-            local.set 1
-            local.get 3
-            i64.const 4294967295
-            i64.and
-            local.set 9
-            block  ;; label = @5
-              loop  ;; label = @6
-                block  ;; label = @7
-                  local.get 4
-                  i64.const 4294967295
-                  i64.gt_u
-                  br_if 0 (;@7;)
-                  local.get 4
-                  local.get 9
-                  i64.mul
-                  local.get 10
-                  i64.const 32
-                  i64.shl
-                  local.get 1
-                  i64.or
-                  i64.le_u
-                  br_if 2 (;@5;)
-                end
-                local.get 4
-                i64.const -1
-                i64.add
-                local.set 4
-                local.get 10
-                local.get 2
-                i64.add
-                local.tee 10
-                i64.const 4294967296
-                i64.lt_u
-                br_if 0 (;@6;)
-              end
-            end
-            local.get 1
-            local.get 8
-            i64.const 32
-            i64.shl
-            i64.or
-            local.get 4
-            local.get 3
-            i64.mul
-            i64.sub
-            local.tee 8
-            local.get 8
-            local.get 2
-            i64.div_u
-            local.tee 10
-            local.get 2
-            i64.mul
-            i64.sub
-            local.set 1
-            block  ;; label = @5
-              loop  ;; label = @6
-                block  ;; label = @7
-                  local.get 10
-                  i64.const 4294967295
-                  i64.gt_u
-                  br_if 0 (;@7;)
-                  local.get 10
-                  local.get 9
-                  i64.mul
-                  local.get 1
-                  i64.const 32
-                  i64.shl
-                  local.get 7
-                  i64.or
-                  i64.le_u
-                  br_if 2 (;@5;)
-                end
-                local.get 10
-                i64.const -1
-                i64.add
-                local.set 10
-                local.get 1
-                local.get 2
-                i64.add
-                local.tee 1
-                i64.const 4294967296
-                i64.lt_u
-                br_if 0 (;@6;)
-              end
-            end
-            local.get 8
-            i64.const 32
-            i64.shl
-            local.get 7
-            i64.or
-            local.get 10
-            local.get 3
-            i64.mul
-            i64.sub
-            local.get 12
-            i64.shr_u
-            local.set 1
-          end
-          local.get 10
-          local.get 4
-          i64.const 32
-          i64.shl
-          i64.add
-          local.set 7
-          local.get 5
-          i32.eqz
-          br_if 2 (;@1;)
-          local.get 5
-          i64.const 0
-          i64.store offset=8
-          local.get 5
-          local.get 1
-          i64.store
-          br 2 (;@1;)
-        end
-        local.get 6
-        local.get 3
-        local.get 4
-        local.get 4
-        i64.clz
-        i32.wrap_i64
-        local.get 2
-        i64.clz
-        i32.wrap_i64
-        i32.sub
-        local.tee 13
-        call $__ashlti3
-        block  ;; label = @3
-          local.get 13
-          i32.const 0
-          i32.lt_s
-          br_if 0 (;@3;)
-          local.get 6
-          i32.const 8
-          i32.add
-          i64.load
-          local.set 4
-          local.get 6
-          i64.load
-          local.set 10
-          local.get 13
-          i32.const 1
-          i32.add
-          local.set 13
-          i64.const 0
-          local.set 7
-          loop  ;; label = @4
-            local.get 2
-            local.get 4
-            local.get 2
-            i64.const -1
-            i64.xor
-            i64.add
-            local.get 10
-            local.get 1
-            i64.const -1
-            i64.xor
-            i64.add
-            local.get 10
-            i64.lt_u
-            i64.extend_i32_u
-            i64.add
-            i64.const 63
-            i64.shr_s
-            local.tee 9
-            local.get 4
-            i64.and
-            i64.sub
-            local.get 1
-            local.get 9
-            local.get 10
-            i64.and
-            local.tee 3
-            i64.lt_u
-            i64.extend_i32_u
-            i64.sub
-            local.set 2
-            local.get 10
-            i64.const 1
-            i64.shr_u
-            local.get 4
-            i64.const 63
-            i64.shl
-            i64.or
-            local.set 10
-            local.get 7
-            i64.const 1
-            i64.shl
-            local.get 9
-            i64.sub
-            local.set 7
-            local.get 1
-            local.get 3
-            i64.sub
-            local.set 1
-            local.get 4
-            i64.const 1
-            i64.shr_u
-            local.set 4
-            local.get 13
-            i32.const -1
-            i32.add
-            local.tee 13
-            i32.const 0
-            i32.gt_s
-            br_if 0 (;@4;)
-          end
-        end
-        local.get 5
-        i32.eqz
-        br_if 0 (;@2;)
-        local.get 5
-        local.get 2
-        i64.store offset=8
-        local.get 5
-        local.get 1
-        i64.store
-      end
-      i64.const 0
-      local.set 11
-    end
-    local.get 0
-    local.get 7
-    i64.store
-    local.get 0
-    local.get 11
-    i64.store offset=8
-    local.get 6
-    i32.const 16
-    i32.add
-    global.set $__stack_pointer)
-  (func $__udivti3 (type 25) (param i32 i64 i64 i64 i64)
-    (local i32)
-    global.get $__stack_pointer
-    i32.const 16
-    i32.sub
-    local.tee 5
-    global.set $__stack_pointer
-    local.get 5
-    local.get 1
-    local.get 2
-    local.get 3
-    local.get 4
-    i32.const 0
-    call $__udivmodti4
-    local.get 5
-    i64.load
-    local.set 1
-    local.get 0
-    local.get 5
-    i32.const 8
-    i32.add
-    i64.load
-    i64.store offset=8
-    local.get 0
-    local.get 1
-    i64.store
-    local.get 5
-    i32.const 16
-    i32.add
-    global.set $__stack_pointer)
   (table (;0;) 6 6 funcref)
   (memory (;0;) 2)
   (global $__stack_pointer (mut i32) (i32.const 69248))
-  (global (;1;) i32 (i32.const 1340))
+  (global (;1;) i32 (i32.const 1336))
   (global (;2;) i32 (i32.const 3652))
-  (global (;3;) i32 (i32.const 1336))
-  (global (;4;) i32 (i32.const 3672))
-  (global (;5;) i32 (i32.const 3676))
-  (global (;6;) i32 (i32.const 3680))
-  (global (;7;) i32 (i32.const 3708))
-  (global (;8;) i32 (i32.const 3672))
-  (global (;9;) i32 (i32.const 3676))
+  (global (;3;) i32 (i32.const 3672))
+  (global (;4;) i32 (i32.const 3676))
+  (global (;5;) i32 (i32.const 3680))
+  (global (;6;) i32 (i32.const 3708))
+  (global (;7;) i32 (i32.const 3672))
+  (global (;8;) i32 (i32.const 3676))
+  (global (;9;) i32 (i32.const 3668))
   (global (;10;) i32 (i32.const 3668))
-  (global (;11;) i32 (i32.const 3668))
-  (global (;12;) i32 (i32.const 3648))
-  (global (;13;) i32 (i32.const 3536))
-  (global (;14;) i32 (i32.const 1024))
-  (global (;15;) i32 (i32.const 3712))
-  (global (;16;) i32 (i32.const 1024))
-  (global (;17;) i32 (i32.const 69248))
-  (global (;18;) i32 (i32.const 0))
-  (global (;19;) i32 (i32.const 1))
+  (global (;11;) i32 (i32.const 3648))
+  (global (;12;) i32 (i32.const 3536))
+  (global (;13;) i32 (i32.const 1024))
+  (global (;14;) i32 (i32.const 3712))
+  (global (;15;) i32 (i32.const 1024))
+  (global (;16;) i32 (i32.const 69248))
+  (global (;17;) i32 (i32.const 0))
+  (global (;18;) i32 (i32.const 1))
   (export "memory" (memory 0))
   (export "__wasm_call_ctors" (func $__wasm_call_ctors))
   (export "_start" (func $_start))
@@ -9018,17 +7993,12 @@
   (export "stderr" (global 1))
   (export "fprintf" (func $fprintf))
   (export "dummy" (func $dummy))
-  (export "sleep" (func $sleep))
   (export "main" (func $main))
   (export "__main_void" (func $__original_main))
   (export "errno" (global 2))
-  (export "_CLOCK_REALTIME" (global 3))
-  (export "clock_nanosleep" (func $clock_nanosleep))
   (export "__lseek" (func $__lseek))
   (export "lseek" (func $__lseek))
   (export "close" (func $close))
-  (export "__muloti4" (func $__muloti4))
-  (export "__wasi_poll_oneoff" (func $__wasi_poll_oneoff))
   (export "writev" (func $writev))
   (export "_Exit" (func $_Exit))
   (export "_exit" (func $_Exit))
@@ -9070,7 +8040,7 @@
   (export "__wasi_path_rename" (func $__wasi_path_rename))
   (export "__wasi_path_symlink" (func $__wasi_path_symlink))
   (export "__wasi_path_unlink_file" (func $__wasi_path_unlink_file))
-  (export "strlen" (func $strlen))
+  (export "__wasi_poll_oneoff" (func $__wasi_poll_oneoff))
   (export "__wasi_proc_exit" (func $__wasi_proc_exit))
   (export "__wasi_proc_raise" (func $__wasi_proc_raise))
   (export "__wasi_sched_yield" (func $__wasi_sched_yield))
@@ -9084,16 +8054,17 @@
   (export "__wasm_call_dtors" (func $__wasm_call_dtors))
   (export "__funcs_on_exit" (func $dummy.1))
   (export "__stdio_exit" (func $__stdio_exit))
-  (export "__progname" (global 4))
-  (export "__progname_full" (global 5))
-  (export "__libc" (global 6))
-  (export "__hwcap" (global 7))
-  (export "program_invocation_short_name" (global 8))
-  (export "program_invocation_name" (global 9))
+  (export "strlen" (func $strlen))
+  (export "__progname" (global 3))
+  (export "__progname_full" (global 4))
+  (export "__libc" (global 5))
+  (export "__hwcap" (global 6))
+  (export "program_invocation_short_name" (global 7))
+  (export "program_invocation_name" (global 8))
   (export "__stdio_close" (func $__stdio_close))
-  (export "__stdin_used" (global 10))
-  (export "__stdout_used" (global 11))
-  (export "__stderr_used" (global 12))
+  (export "__stdin_used" (global 9))
+  (export "__stdout_used" (global 10))
+  (export "__stderr_used" (global 11))
   (export "__stdio_exit_needed" (func $__stdio_exit))
   (export "__stdio_seek" (func $__stdio_seek))
   (export "__stdio_write" (func $__stdio_write))
@@ -9107,7 +8078,7 @@
   (export "fwrite_unlocked" (func $fwrite))
   (export "__ofl_lock" (func $__ofl_lock))
   (export "__ofl_unlock" (func $__ofl_unlock))
-  (export "__stderr_FILE" (global 13))
+  (export "__stderr_FILE" (global 12))
   (export "memcpy" (func $memcpy))
   (export "__lctrans" (func $__lctrans))
   (export "strnlen" (func $strnlen))
@@ -9118,16 +8089,12 @@
   (export "__lctrans_impl" (func $dummy.2))
   (export "__lctrans_cur" (func $__lctrans_cur))
   (export "wcrtomb" (func $wcrtomb))
-  (export "__ashlti3" (func $__ashlti3))
-  (export "__udivti3" (func $__udivti3))
-  (export "__multi3" (func $__multi3))
-  (export "__udivmodti4" (func $__udivmodti4))
-  (export "__dso_handle" (global 14))
-  (export "__data_end" (global 15))
-  (export "__global_base" (global 16))
-  (export "__heap_base" (global 17))
-  (export "__memory_base" (global 18))
-  (export "__table_base" (global 19))
+  (export "__dso_handle" (global 13))
+  (export "__data_end" (global 14))
+  (export "__global_base" (global 15))
+  (export "__heap_base" (global 16))
+  (export "__memory_base" (global 17))
+  (export "__table_base" (global 18))
   (elem (;0;) (i32.const 1) func $add $dummy $__stdio_close $__stdio_write $__stdio_seek)
-  (data $.rodata (i32.const 1024) "-+   0X0x\00-0X+0X 0X-0x+0x 0x\00nan\00inf\00NAN\00INF\00.\00(null)\00inside function dummy\0a\00register remote function: dummy %p\0a\00register remote function: add %p\0a\00Support for formatting long double values is currently disabled.\0aTo enable it, add -lc-printscan-long-double to the link command.\0a\00inside function add(%d, %d, %d)\0a\00\00\00\00\00\00\d0\0d\00\00Success\00Illegal byte sequence\00Domain error\00Result not representable\00Not a tty\00Permission denied\00Operation not permitted\00No such file or directory\00No such process\00File exists\00Value too large for data type\00No space left on device\00Out of memory\00Resource busy\00Interrupted system call\00Resource temporarily unavailable\00Invalid seek\00Cross-device link\00Read-only file system\00Directory not empty\00Connection reset by peer\00Operation timed out\00Connection refused\00Host is unreachable\00Address in use\00Broken pipe\00I/O error\00No such device or address\00No such device\00Not a directory\00Is a directory\00Text file busy\00Exec format error\00Invalid argument\00Argument list too long\00Symbolic link loop\00Filename too long\00Too many open files in system\00No file descriptors available\00Bad file descriptor\00No child process\00Bad address\00File too large\00Too many links\00No locks available\00Resource deadlock would occur\00State not recoverable\00Previous owner died\00Operation canceled\00Function not implemented\00No message of desired type\00Identifier removed\00Link has been severed\00Protocol error\00Bad message\00Not a socket\00Destination address required\00Message too large\00Protocol wrong type for socket\00Protocol not available\00Protocol not supported\00Not supported\00Address family not supported by protocol\00Address not available\00Network is down\00Network unreachable\00Connection reset by network\00Connection aborted\00No buffer space available\00Socket is connected\00Socket not connected\00Operation already in progress\00Operation in progress\00Stale file handle\00Quota exceeded\00Multihop attempted\00Capabilities insufficient\00\00\00u\02N\00\d6\01\e2\04\b9\04\18\01\8e\05\ed\02\16\04\f2\00\97\03\01\038\05\af\01\82\01O\03/\04\1e\00\d4\05\a2\00\12\03\1e\03\c2\01\de\03\08\00\ac\05\00\01d\02\f1\01e\054\02\8c\02\cf\02-\03L\04\e3\05\9f\02\f8\04\1c\05\08\05\b1\02K\05\15\02x\00R\02<\03\f1\03\e4\00\c3\03}\04\cc\00\aa\03y\05$\02n\01m\03\22\04\ab\04D\00\fb\01\ae\00\83\03`\00\e5\01\07\04\94\04^\04+\00X\019\01\92\00\c2\05\9b\01C\02F\01\f6\05\00\00\00\00\00\00\19\00\0a\00\19\19\19\00\00\00\00\05\00\00\00\00\00\00\09\00\00\00\00\0b\00\00\00\00\00\00\00\00\19\00\11\0a\19\19\19\03\0a\07\00\01\1b\09\0b\18\00\00\09\06\0b\00\00\0b\00\06\19\00\00\00\19\19\19\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\0e\00\00\00\00\00\00\00\00\19\00\0a\0d\19\19\19\00\0d\00\00\02\00\09\0e\00\00\00\09\00\0e\00\00\0e\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\0c\00\00\00\00\00\00\00\00\00\00\00\13\00\00\00\00\13\00\00\00\00\09\0c\00\00\00\00\00\0c\00\00\0c\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\10\00\00\00\00\00\00\00\00\00\00\00\0f\00\00\00\04\0f\00\00\00\00\09\10\00\00\00\00\00\10\00\00\10\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\12\00\00\00\00\00\00\00\00\00\00\00\11\00\00\00\00\11\00\00\00\00\09\12\00\00\00\00\00\12\00\00\12\00\00\1a\00\00\00\1a\1a\1a\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\1a\00\00\00\1a\1a\1a\00\00\00\00\00\00\09\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\14\00\00\00\00\00\00\00\00\00\00\00\17\00\00\00\00\17\00\00\00\00\09\14\00\00\00\00\00\14\00\00\14\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\16\00\00\00\00\00\00\00\00\00\00\00\15\00\00\00\00\15\00\00\00\00\09\16\00\00\00\00\00\16\00\00\16\00\000123456789ABCDEF")
+  (data $.rodata (i32.const 1024) "-+   0X0x\00-0X+0X 0X-0x+0x 0x\00nan\00inf\00NAN\00INF\00.\00(null)\00inside function dummy\0a\00register remote function: dummy %p\0a\00register remote function: add %p\0a\00Support for formatting long double values is currently disabled.\0aTo enable it, add -lc-printscan-long-double to the link command.\0a\00inside function add(%d, %d, %d)\0a\00\00\d0\0d\00\00Success\00Illegal byte sequence\00Domain error\00Result not representable\00Not a tty\00Permission denied\00Operation not permitted\00No such file or directory\00No such process\00File exists\00Value too large for data type\00No space left on device\00Out of memory\00Resource busy\00Interrupted system call\00Resource temporarily unavailable\00Invalid seek\00Cross-device link\00Read-only file system\00Directory not empty\00Connection reset by peer\00Operation timed out\00Connection refused\00Host is unreachable\00Address in use\00Broken pipe\00I/O error\00No such device or address\00No such device\00Not a directory\00Is a directory\00Text file busy\00Exec format error\00Invalid argument\00Argument list too long\00Symbolic link loop\00Filename too long\00Too many open files in system\00No file descriptors available\00Bad file descriptor\00No child process\00Bad address\00File too large\00Too many links\00No locks available\00Resource deadlock would occur\00State not recoverable\00Previous owner died\00Operation canceled\00Function not implemented\00No message of desired type\00Identifier removed\00Link has been severed\00Protocol error\00Bad message\00Not a socket\00Destination address required\00Message too large\00Protocol wrong type for socket\00Protocol not available\00Protocol not supported\00Not supported\00Address family not supported by protocol\00Address not available\00Network is down\00Network unreachable\00Connection reset by network\00Connection aborted\00No buffer space available\00Socket is connected\00Socket not connected\00Operation already in progress\00Operation in progress\00Stale file handle\00Quota exceeded\00Multihop attempted\00Capabilities insufficient\00\00\00\00\00\00\00u\02N\00\d6\01\e2\04\b9\04\18\01\8e\05\ed\02\16\04\f2\00\97\03\01\038\05\af\01\82\01O\03/\04\1e\00\d4\05\a2\00\12\03\1e\03\c2\01\de\03\08\00\ac\05\00\01d\02\f1\01e\054\02\8c\02\cf\02-\03L\04\e3\05\9f\02\f8\04\1c\05\08\05\b1\02K\05\15\02x\00R\02<\03\f1\03\e4\00\c3\03}\04\cc\00\aa\03y\05$\02n\01m\03\22\04\ab\04D\00\fb\01\ae\00\83\03`\00\e5\01\07\04\94\04^\04+\00X\019\01\92\00\c2\05\9b\01C\02F\01\f6\05\00\00\00\00\00\00\19\00\0a\00\19\19\19\00\00\00\00\05\00\00\00\00\00\00\09\00\00\00\00\0b\00\00\00\00\00\00\00\00\19\00\11\0a\19\19\19\03\0a\07\00\01\1b\09\0b\18\00\00\09\06\0b\00\00\0b\00\06\19\00\00\00\19\19\19\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\0e\00\00\00\00\00\00\00\00\19\00\0a\0d\19\19\19\00\0d\00\00\02\00\09\0e\00\00\00\09\00\0e\00\00\0e\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\0c\00\00\00\00\00\00\00\00\00\00\00\13\00\00\00\00\13\00\00\00\00\09\0c\00\00\00\00\00\0c\00\00\0c\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\10\00\00\00\00\00\00\00\00\00\00\00\0f\00\00\00\04\0f\00\00\00\00\09\10\00\00\00\00\00\10\00\00\10\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\12\00\00\00\00\00\00\00\00\00\00\00\11\00\00\00\00\11\00\00\00\00\09\12\00\00\00\00\00\12\00\00\12\00\00\1a\00\00\00\1a\1a\1a\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\1a\00\00\00\1a\1a\1a\00\00\00\00\00\00\09\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\14\00\00\00\00\00\00\00\00\00\00\00\17\00\00\00\00\17\00\00\00\00\09\14\00\00\00\00\00\14\00\00\14\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\16\00\00\00\00\00\00\00\00\00\00\00\15\00\00\00\00\15\00\00\00\00\09\16\00\00\00\00\00\16\00\00\16\00\000123456789ABCDEF")
   (data $.data (i32.const 3536) "\05\00\00\00\00\00\00\00\00\00\00\00\03\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\04\00\00\00\05\00\00\00P\0e\00\00\00\00\00\00\00\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00\ff\ff\ff\ff\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\d0\0d\00\00"))

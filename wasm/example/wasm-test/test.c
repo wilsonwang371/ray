@@ -21,6 +21,5 @@ int main() {
   REMOTE(add, 122, 233, 344);
   fprintf(stderr, "register remote function: dummy %p\n", dummy);
   REMOTE(dummy);
-  sleep(5);
   return 0;
 }
