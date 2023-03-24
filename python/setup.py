@@ -40,6 +40,7 @@ BUILD_JAVA = os.getenv("RAY_INSTALL_JAVA") == "1"
 SKIP_BAZEL_BUILD = os.getenv("SKIP_BAZEL_BUILD") == "1"
 BAZEL_ARGS = os.getenv("BAZEL_ARGS")
 BAZEL_LIMIT_CPUS = os.getenv("BAZEL_LIMIT_CPUS")
+VERBOSE_BUILD = os.getenv("VERBOSE_BUILD") == "1"
 
 PICKLE5_SUBDIR = os.path.join("ray", "pickle5_files")
 THIRDPARTY_SUBDIR = os.path.join("ray", "thirdparty_files")
@@ -85,6 +86,7 @@ def find_version(*filepath):
 class SetupType(Enum):
     RAY = 1
     RAY_CPP = 2
+    RAY_WASM = 3
 
 
 class BuildType(Enum):
@@ -141,6 +143,14 @@ if os.getenv("RAY_INSTALL_CPP") == "1":
         "A subpackage of Ray which provides the Ray C++ API.",
         BUILD_TYPE,
     )
+elif os.getenv("RAY_INSTALL_WASM") == "1":
+    # "ray-wasm" wheel package.
+    setup_spec = SetupSpec(
+        SetupType.RAY_WASM,
+        "ray-wasm",
+        "A subpackage of Ray which provides the Ray WASM API.",
+        BUILD_TYPE,
+    )
 else:
     # "ray" primary wheel package.
     setup_spec = SetupSpec(
@@ -177,6 +187,15 @@ if setup_spec.type == SetupType.RAY_CPP:
     setup_spec.files_to_include += [
         os.path.join(dirpath, filename)
         for dirpath, dirnames, filenames in os.walk("ray/cpp")
+        for filename in filenames
+    ]
+
+if setup_spec.type == SetupType.RAY_WASM:
+    setup_spec.files_to_include += ["ray/wasm/default_worker" + exe_suffix]
+    # WASM API library and project template files.
+    setup_spec.files_to_include += [
+        os.path.join(dirpath, filename)
+        for dirpath, dirnames, filenames in os.walk("ray/wasm")
         for filename in filenames
     ]
 
@@ -497,7 +516,7 @@ if is_automated_build and is_native_windows_or_msys():
     replace_symlinks_with_junctions()
 
 
-def build(build_python, build_java, build_cpp):
+def build(build_python, build_java, build_cpp, build_wasm, verbose=False):
     if tuple(sys.version_info[:2]) not in SUPPORTED_PYTHONS:
         msg = (
             "Detected Python version {}, which is not supported. "
@@ -617,6 +636,7 @@ def build(build_python, build_java, build_cpp):
     bazel_targets = []
     bazel_targets += ["//:ray_pkg"] if build_python else []
     bazel_targets += ["//cpp:ray_cpp_pkg"] if build_cpp else []
+    bazel_targets += ["//wasm:ray_wasm_pkg"] if build_wasm else []
     bazel_targets += ["//java:ray_java_pkg"] if build_java else []
 
     if setup_spec.build_type == BuildType.DEBUG:
@@ -625,6 +645,9 @@ def build(build_python, build_java, build_cpp):
         bazel_flags.extend(["--config=asan-build"])
     if setup_spec.build_type == BuildType.TSAN:
         bazel_flags.extend(["--config=tsan"])
+
+    if verbose:
+        bazel_flags.extend(["--subcommands", "--verbose_failures"])
 
     return bazel_invoke(
         subprocess.check_call,
@@ -676,9 +699,9 @@ def add_system_dlls(dlls, target_dir):
 
 def pip_run(build_ext):
     if SKIP_BAZEL_BUILD:
-        build(False, False, False)
+        build(False, False, False, False, VERBOSE_BUILD)
     else:
-        build(True, BUILD_JAVA, True)
+        build(True, BUILD_JAVA, True, True, VERBOSE_BUILD)
 
     if setup_spec.type == SetupType.RAY:
         setup_spec.files_to_include += ray_files
@@ -720,18 +743,24 @@ def api_main(program, *args):
     parser.add_argument(
         "-l",
         "--language",
-        default="python,cpp",
+        default="python,cpp,wasm",
         type=str,
         help="A list of languages to build native libraries. "
         'Supported languages include "python" and "java". '
         "If not specified, only the Python library will be built.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Whether to print verbose output.",
     )
     parsed_args = parser.parse_args(args)
 
     result = None
 
     if parsed_args.command == "build":
-        kwargs = dict(build_python=False, build_java=False, build_cpp=False)
+        kwargs = dict(build_python=False, build_java=False, build_cpp=False, build_wasm=False)
         for lang in parsed_args.language.split(","):
             if "python" in lang:
                 kwargs.update(build_python=True)
@@ -739,9 +768,11 @@ def api_main(program, *args):
                 kwargs.update(build_java=True)
             elif "cpp" in lang:
                 kwargs.update(build_cpp=True)
+            elif "wasm" in lang:
+                kwargs.update(build_wasm=True)
             else:
                 raise ValueError("invalid language: {!r}".format(lang))
-        result = build(**kwargs)
+        result = build(**kwargs, verbose=parsed_args.verbose)
     elif parsed_args.command == "python_versions":
         for version in SUPPORTED_PYTHONS:
             # NOTE: On Windows this will print "\r\n" on the command line.
