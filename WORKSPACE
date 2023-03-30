@@ -28,9 +28,6 @@ crates_repository(
             version = "4.1.11",
             features = ["derive"],
         ),
-        "lazy_static": crate.spec(
-            version = "1.4.0",
-        ),
         "prost": crate.spec(
             version = "0.11",
         ),
@@ -58,7 +55,13 @@ crates_repository(
             version = "0.3.16",
         ),
         "wasmtime": crate.spec(
-            version = "7.0.0",
+            version = "6.0.0",
+        ),
+        "wasmtime-wasi": crate.spec(
+            version = "6.0.0",
+        ),
+        "lazy_static": crate.spec(
+            version = "1.4.0",
         ),
     },
     render_config = render_config(
