@@ -149,8 +149,8 @@ pub struct WorkerParameters {
     pub ray_job_namespace: Option<String>,
 
     /// type of the wasm engine to use
-    #[arg(long, value_enum, verbatim_doc_comment, default_value_t = WasmEngineType::Wasmtime)]
-    pub engine_type: WasmEngineType,
+    #[arg(long, value_enum, verbatim_doc_comment, default_value_t = WasmEngineTypeParam::Wavm)]
+    pub engine_type: WasmEngineTypeParam,
 }
 
 impl WorkerParameters {
@@ -172,17 +172,17 @@ impl WorkerParameters {
             ray_runtime_env: None,
             ray_runtime_env_hash: None,
             ray_job_namespace: None,
-            engine_type: WasmEngineType::Wasmtime,
+            engine_type: WasmEngineTypeParam::Wasmtime,
         }
     }
 }
 
 #[derive(ValueEnum, Debug, Clone)]
-pub enum WasmEngineType {
+pub enum WasmEngineTypeParam {
     Wasmedge,
     Wasmtime,
-    WAVM,
-    WAMR,
+    Wavm,
+    Wamr,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -203,8 +203,8 @@ pub struct LauncherParameters {
     pub file_format: WasmFileFormat,
 
     /// type of the wasm engine to use
-    #[arg(short = 'e', long, value_enum, verbatim_doc_comment, default_value_t = WasmEngineType::Wasmtime)]
-    pub engine_type: WasmEngineType,
+    #[arg(short = 'e', long, value_enum, verbatim_doc_comment, default_value_t = WasmEngineTypeParam::Wavm)]
+    pub engine_type: WasmEngineTypeParam,
 
     /// the entry point function name
     /// if not set, the default value is `_start`

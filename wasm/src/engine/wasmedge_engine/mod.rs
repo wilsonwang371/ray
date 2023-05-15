@@ -28,7 +28,7 @@ impl WasmEdgeEngine {
 }
 
 impl WasmEngine for WasmEdgeEngine {
-    fn init(&self) -> Result<()> {
+    fn init(&mut self) -> Result<()> {
         unimplemented!()
     }
 
@@ -83,7 +83,7 @@ impl WasmEngine for WasmEdgeEngine {
         unimplemented!()
     }
 
-    fn register_hostcalls(&mut self, _hostcalls: &Hostcalls) -> Result<()> {
+    fn register_hostcalls(&mut self, _sandbox_name: &str, _hostcalls: &Hostcalls) -> Result<()> {
         unimplemented!()
     }
 

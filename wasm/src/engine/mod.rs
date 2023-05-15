@@ -14,17 +14,20 @@
 
 mod wasmedge_engine;
 mod wasmtime_engine;
+mod wavm_engine;
 
 use std::sync::Arc;
 use std::sync::{Mutex, RwLock};
 
 use crate::engine::wasmtime_engine::WasmtimeEngine;
+use crate::engine::wavm_engine::WavmEngine;
 use crate::runtime::{ObjectID, RemoteFunctionHolder, WasmTaskExecutionInfo};
 use crate::{engine::wasmedge_engine::WasmEdgeEngine, runtime::RayRuntime};
 
 use anyhow::{anyhow, Result};
 use core::result::Result::Ok;
 use lazy_static::lazy_static;
+use libc::c_void;
 use rmp::decode::{read_i32, read_i64, read_u32, read_u64};
 use rmp::encode::{write_i32, write_i64, write_u32, write_u64};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -46,7 +49,7 @@ lazy_static! {
 }
 
 pub trait WasmEngine {
-    fn init(&self) -> Result<()>;
+    fn init(&mut self) -> Result<()>;
 
     fn compile(&mut self, name: &str, wasm_bytes: &[u8]) -> Result<Box<&dyn WasmModule>>;
     fn create_sandbox(&mut self, name: &str) -> Result<Box<&dyn WasmSandbox>>;
@@ -72,7 +75,7 @@ pub trait WasmEngine {
     fn list_sandboxes(&self) -> Result<Vec<Box<&dyn WasmSandbox>>>;
     fn list_instances(&self, sandbox_name: &str) -> Result<Vec<Box<&dyn WasmInstance>>>;
 
-    fn register_hostcalls(&mut self, hostcalls: &Hostcalls) -> Result<()>;
+    fn register_hostcalls(&mut self, sandbox_name: &str, hostcalls: &Hostcalls) -> Result<()>;
 
     fn task_loop_once(&mut self, rt: &Arc<RwLock<Box<dyn RayRuntime + Send + Sync>>>)
         -> Result<()>;
@@ -101,6 +104,7 @@ impl WasmEngineFactory {
         let engine: Box<dyn WasmEngine + Send + Sync> = match engine_type {
             WasmEngineType::WASMTIME => Box::new(WasmtimeEngine::new()),
             WasmEngineType::WASMEDGE => Box::new(WasmEdgeEngine::new()),
+            WasmEngineType::WAVM => Box::new(WavmEngine::new()),
             _ => {
                 return Err(anyhow!("unsupported wasm engine type"));
             }
@@ -206,12 +210,14 @@ pub struct Hostcalls {
     pub runtime: Arc<RwLock<Box<dyn RayRuntime + Send + Sync>>>,
 }
 
+pub type HostcallFunc = fn(&mut dyn WasmContext, &[WasmValue]) -> Result<Vec<WasmValue>>;
+
 #[derive(Clone)]
 pub struct Hostcall {
     pub name: String,
     pub params: Vec<WasmType>,
     pub results: Vec<WasmType>,
-    pub func: fn(&mut dyn WasmContext, &[WasmValue]) -> Result<Vec<WasmValue>>,
+    pub func: HostcallFunc,
 }
 
 #[derive(Debug, Clone)]

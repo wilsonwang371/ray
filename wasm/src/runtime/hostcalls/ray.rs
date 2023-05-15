@@ -25,6 +25,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use core::result::Result::Ok;
+use libc::c_void;
 use tracing::{debug, error, info};
 
 const RAY_BUF_MAGIC: u32 = 0xc0de_550a;
@@ -212,6 +213,7 @@ fn read_ray_buffer(ctx: &mut dyn WasmContext, ray_buf_ptr: u32) -> Result<RayBuf
 }
 
 pub fn register_ray_hostcalls(
+    sandbox_name: &str,
     runtime: &Arc<RwLock<Box<dyn RayRuntime + Send + Sync>>>,
     engine: &Arc<RwLock<Box<dyn WasmEngine + Send + Sync>>>,
 ) -> Result<()> {
@@ -254,7 +256,7 @@ pub fn register_ray_hostcalls(
         .unwrap();
     {
         let mut engine = engine.write().unwrap();
-        engine.register_hostcalls(&hostcalls)?;
+        engine.register_hostcalls(sandbox_name, &hostcalls)?;
     }
     Ok(())
 }

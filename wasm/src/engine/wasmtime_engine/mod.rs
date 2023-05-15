@@ -36,6 +36,7 @@ pub struct WasmtimeEngine {
     linker: Linker<WasmtimeStoreData>,
     modules: HashMap<String, WasmtimeModule>,
     sandboxes: HashMap<String, WasmtimeSandbox>,
+    hostcalls: Option<Hostcalls>,
 }
 
 impl WasmtimeEngine {
@@ -46,6 +47,7 @@ impl WasmtimeEngine {
             linker: Linker::new(&engine),
             modules: HashMap::new(),
             sandboxes: HashMap::new(),
+            hostcalls: None,
         }
     }
 }
@@ -119,7 +121,7 @@ impl WasmtimeInstance {
 impl WasmInstance for WasmtimeInstance {}
 
 impl WasmEngine for WasmtimeEngine {
-    fn init(&self) -> Result<()> {
+    fn init(&mut self) -> Result<()> {
         Ok(())
     }
 
@@ -367,7 +369,7 @@ impl WasmEngine for WasmtimeEngine {
         unimplemented!()
     }
 
-    fn register_hostcalls(&mut self, hostcalls: &Hostcalls) -> Result<()> {
+    fn register_hostcalls(&mut self, _sandbox_name: &str, hostcalls: &Hostcalls) -> Result<()> {
         // iterate all hostcalls
         for hostcall in hostcalls.functions.iter() {
             // register hostcall to wasmtime linker
@@ -444,6 +446,9 @@ impl WasmEngine for WasmtimeEngine {
                 }
             }
         }
+        if self.hostcalls.is_none() {
+            self.hostcalls = Some(hostcalls.clone());
+        }
         Ok(())
     }
 
@@ -494,6 +499,11 @@ impl WasmEngine for WasmtimeEngine {
                                 );
                             }
                         }
+
+                        // this hostcall setup is for WAVM for now
+                        let hostcall = self.hostcalls.as_ref().unwrap().clone();
+                        self.register_hostcalls("sandbox", &hostcall).unwrap();
+
                         match self.instantiate("sandbox", mod_name, "instance") {
                             Ok(_) => {}
                             Err(e) => {

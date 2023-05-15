@@ -4,6 +4,26 @@
 load("//bazel:ray.bzl", "COPTS")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_dylib_library", "rust_library")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+cmake(
+    name = "libwavm-static",
+    build_args = ["-j8"],
+    cache_entries = {
+        "WAVM_ENABLE_STATIC_LINKING": "ON",
+    },
+    env = {
+        "V": "1",
+        "VERBOSE": "1",
+    },
+    lib_source = "@com_github_wavm_wavm//:all_srcs",
+    out_static_libs = [
+        "libWAVM.a",
+        "libWAVMBLAKE2.a",
+        "libWAVMUnwind.a",
+        "libWAVMlmdb.a",
+    ],
+)
 
 cargo_build_script(
     name = "ray_wasm_buildrs",
@@ -30,6 +50,12 @@ cargo_build_script(
     ],
 )
 
+genrule(
+    name = "llvm_flags_file",
+    outs = ["llvm_flags"],
+    cmd = "llvm-config --libs --ldflags > $@",
+)
+
 rust_library(
     name = "ray_wasm_lib",
     srcs = glob(
@@ -42,25 +68,35 @@ rust_library(
     ),
     crate_name = "wasm_on_ray",
     crate_root = "src/lib.rs",
+    rustc_flags = [
+        "@$(location llvm_flags_file)",
+        # "-L/usr/lib/llvm-10/lib",
+        # "-lLLVM-10",
+        #"$$(llvm-config --libs --ldflags)",
+    ],
     visibility = ["//visibility:public"],
+    data = [
+        "llvm_flags_file",
+    ],
     deps = [
+        "libwavm-static",
         "ray_wasm_buildrs",
         "//:core_worker_lib",
         "//:global_state_accessor_lib",
         "@wasm_crate_index//:anyhow",
         "@wasm_crate_index//:clap",
         "@wasm_crate_index//:lazy_static",
+        "@wasm_crate_index//:libc",
         "@wasm_crate_index//:prost",
+        "@wasm_crate_index//:rmp",
         "@wasm_crate_index//:serde",
         "@wasm_crate_index//:serde_json",
+        "@wasm_crate_index//:sha256",
         "@wasm_crate_index//:tokio",
         "@wasm_crate_index//:tracing",
         "@wasm_crate_index//:tracing-subscriber",
         "@wasm_crate_index//:uuid",
         "@wasm_crate_index//:wasmtime",
-        "@wasm_crate_index//:libc",
-        "@wasm_crate_index//:rmp",
-        "@wasm_crate_index//:sha256",
     ],
 )
 
@@ -80,27 +116,31 @@ rust_dylib_library(
     crate_name = "wasm_on_ray",
     crate_root = "src/lib.rs",
     rustc_flags = [
-        "-C", "prefer-dynamic",
+        "-C",
+        "prefer-dynamic",
+        "-C",
+        "link-arg=-lunwind",
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "libwavm-static",
         "ray_wasm_buildrs",
         "//:core_worker_lib",
         "//:global_state_accessor_lib",
         "@wasm_crate_index//:anyhow",
         "@wasm_crate_index//:clap",
         "@wasm_crate_index//:lazy_static",
+        "@wasm_crate_index//:libc",
         "@wasm_crate_index//:prost",
+        "@wasm_crate_index//:rmp",
         "@wasm_crate_index//:serde",
         "@wasm_crate_index//:serde_json",
+        "@wasm_crate_index//:sha256",
         "@wasm_crate_index//:tokio",
         "@wasm_crate_index//:tracing",
         "@wasm_crate_index//:tracing-subscriber",
         "@wasm_crate_index//:uuid",
         "@wasm_crate_index//:wasmtime",
-        "@wasm_crate_index//:libc",
-        "@wasm_crate_index//:rmp",
-        "@wasm_crate_index//:sha256",
     ],
 )
 
@@ -136,13 +176,13 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":ray_wasm_lib",
-        "@wasm_crate_index//:sha256",
         "@wasm_crate_index//:anyhow",
         "@wasm_crate_index//:clap",
         "@wasm_crate_index//:lazy_static",
         "@wasm_crate_index//:prost",
         "@wasm_crate_index//:serde",
         "@wasm_crate_index//:serde_json",
+        "@wasm_crate_index//:sha256",
         "@wasm_crate_index//:tokio",
         "@wasm_crate_index//:tracing",
         "@wasm_crate_index//:tracing-subscriber",
@@ -180,6 +220,7 @@ genrule(
         "raywa",
         "libray_wasm.so",
         "ray_wasm_lib.dylib",
+        "libwavm-static",
     ],
     outs = ["ray_wasm_pkg.out"],
     cmd = """
@@ -189,6 +230,7 @@ genrule(
         mkdir -p "$$PY_WASM_DIR/lib/" &&
         cp -f $(location wasm_worker) "$$PY_WASM_DIR/" &&
         cp -f $(location libray_wasm.so) "$$PY_WASM_DIR/lib/" &&
+        cp -f -r $(locations libwavm-static) "$$PY_WASM_DIR/lib/" &&
         cp -f $(location ray_wasm_lib.dylib) "$$PY_WASM_DIR/lib/" &&
         cp -f $(location raywa) "$$PY_WASM_DIR/" &&
         echo "$$WORK_DIR" > $@
