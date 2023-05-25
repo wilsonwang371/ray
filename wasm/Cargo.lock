@@ -999,17 +999,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-derive"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "num-traits"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1884,7 +1873,6 @@ dependencies = [
  "uuid",
  "wasi-common",
  "wasmedge-macro",
- "wasmedge-sdk",
  "wasmedge-sys",
  "wasmedge-types",
  "wasmtime",
@@ -1900,22 +1888,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "wasmedge-sdk"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e1a816fe1c063bde3061fd651247571aea3146f0b86858da2ea240c65180a4d"
-dependencies = [
- "anyhow",
- "num-derive",
- "num-traits",
- "thiserror",
- "wasmedge-macro",
- "wasmedge-sys",
- "wasmedge-types",
- "wat",
 ]
 
 [[package]]

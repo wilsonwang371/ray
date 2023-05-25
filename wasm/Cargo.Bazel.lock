@@ -1,5 +1,5 @@
 {
-  "checksum": "24ab975297dba418c46463de321de8fe64812d33d52c12c75624adfe19ca8875",
+  "checksum": "06a9154b7e6ba5ed4631e7b0e83b90dcb931a76a40f08825a186209d12ad003c",
   "crates": {
     "addr2line 0.19.0": {
       "name": "addr2line",
@@ -5345,53 +5345,6 @@
       },
       "license": "MIT"
     },
-    "num-derive 0.3.3": {
-      "name": "num-derive",
-      "version": "0.3.3",
-      "repository": {
-        "Http": {
-          "url": "https://crates.io/api/v1/crates/num-derive/0.3.3/download",
-          "sha256": "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
-        }
-      },
-      "targets": [
-        {
-          "ProcMacro": {
-            "crate_name": "num_derive",
-            "crate_root": "src/lib.rs",
-            "srcs": [
-              "**/*.rs"
-            ]
-          }
-        }
-      ],
-      "library_target_name": "num_derive",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "proc-macro2 1.0.53",
-              "target": "proc_macro2"
-            },
-            {
-              "id": "quote 1.0.26",
-              "target": "quote"
-            },
-            {
-              "id": "syn 1.0.109",
-              "target": "syn"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2018",
-        "version": "0.3.3"
-      },
-      "license": "MIT OR Apache-2.0"
-    },
     "num-traits 0.2.15": {
       "name": "num-traits",
       "version": "0.2.15",
@@ -5427,7 +5380,6 @@
           "**"
         ],
         "crate_features": [
-          "default",
           "std"
         ],
         "deps": {
@@ -10173,10 +10125,6 @@
               "target": "build_script_build"
             },
             {
-              "id": "wasmedge-sdk 0.8.1",
-              "target": "wasmedge_sdk"
-            },
-            {
               "id": "wasmedge-sys 0.13.1",
               "target": "wasmedge_sys"
             },
@@ -10258,81 +10206,6 @@
         },
         "edition": "2021",
         "version": "0.3.0"
-      },
-      "license": "Apache-2.0"
-    },
-    "wasmedge-sdk 0.8.1": {
-      "name": "wasmedge-sdk",
-      "version": "0.8.1",
-      "repository": {
-        "Http": {
-          "url": "https://crates.io/api/v1/crates/wasmedge-sdk/0.8.1/download",
-          "sha256": "4e1a816fe1c063bde3061fd651247571aea3146f0b86858da2ea240c65180a4d"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "wasmedge_sdk",
-            "crate_root": "src/lib.rs",
-            "srcs": [
-              "**/*.rs"
-            ]
-          }
-        }
-      ],
-      "library_target_name": "wasmedge_sdk",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "crate_features": [
-          "default"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "anyhow 1.0.70",
-              "target": "anyhow"
-            },
-            {
-              "id": "num-traits 0.2.15",
-              "target": "num_traits"
-            },
-            {
-              "id": "thiserror 1.0.40",
-              "target": "thiserror"
-            },
-            {
-              "id": "wasmedge-sys 0.13.1",
-              "target": "wasmedge_sys"
-            },
-            {
-              "id": "wasmedge-types 0.4.1",
-              "target": "wasmedge_types"
-            },
-            {
-              "id": "wat 1.0.61",
-              "target": "wat"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "proc_macro_deps": {
-          "common": [
-            {
-              "id": "num-derive 0.3.3",
-              "target": "num_derive"
-            },
-            {
-              "id": "wasmedge-macro 0.3.0",
-              "target": "wasmedge_macro"
-            }
-          ],
-          "selects": {}
-        },
-        "version": "0.8.1"
       },
       "license": "Apache-2.0"
     },

@@ -27,6 +27,7 @@ pub fn to_wasmtime_raw_value(val: &WasmValue) -> ValRaw {
     }
 }
 
+#[allow(dead_code)]
 pub fn to_wasmtime_value(val: &WasmValue) -> Val {
     match val {
         WasmValue::I32(v) => Val::I32(*v),
@@ -50,6 +51,7 @@ pub fn from_wasmtime_raw_value(ty: &WasmType, val: &ValRaw) -> WasmValue {
     }
 }
 
+#[allow(dead_code)]
 pub fn from_wasmtime_value(ty: &WasmType, val: &Val) -> WasmValue {
     match ty {
         WasmType::I32 => WasmValue::I32(val.unwrap_i32()),

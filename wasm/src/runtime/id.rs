@@ -18,9 +18,10 @@ const TASK_ID_UNIQUE_BYTES: usize = 8;
 pub const UNIQUE_ID_SIZE: usize = 28;
 pub const JOB_ID_SIZE: usize = 4;
 
+#[allow(dead_code)]
+const MAX_OBJECT_ID_INDEX: u32 = ((1 as u64) << 32 - 1) as u32;
 pub const ACTOR_ID_SIZE: usize = JOB_ID_SIZE + ACTOR_ID_UNIQUE_BYTES;
 pub const TASK_ID_SIZE: usize = ACTOR_ID_SIZE + TASK_ID_UNIQUE_BYTES;
-const MAX_OBJECT_ID_INDEX: u32 = ((1 as u64) << 32 - 1) as u32;
 pub const OBJECT_ID_SIZE: usize = TASK_ID_SIZE + 4;
 
 pub const PLACEMENT_GROUP_ID_SIZE: usize = JOB_ID_SIZE + 14;

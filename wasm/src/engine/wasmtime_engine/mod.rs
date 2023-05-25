@@ -50,6 +50,7 @@ impl WasmtimeEngine {
     }
 }
 
+#[allow(dead_code)]
 struct WasmtimeModule {
     name: String,
     module: Module,
@@ -99,6 +100,7 @@ impl WasmtimeSandbox {
 
 impl WasmSandbox for WasmtimeSandbox {}
 
+#[allow(dead_code)]
 #[derive(Clone)]
 struct WasmtimeInstance {
     name: String,
