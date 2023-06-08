@@ -51,6 +51,12 @@ int test_call() {
     return res;
   }
 
+  if (len != sizeof(float)) {
+    fprintf(stderr, "rget len mismatch: %d\n", len);
+    return 1;
+  }
+  printf("result: %f\n", *(float *)result_buf);
+
   free_ray_buffer(rb);
   return 0;
 }
