@@ -165,6 +165,11 @@ for PYTHON_NUMPY in "${PYTHON_NUMPYS[@]}" ; do
     LIBCLANG_PATH="/lib64:${LIBCLANG_PATH-}" \
     RAY_INSTALL_CPP=1 "/opt/python/${PYTHON}/bin/python" setup.py -q bdist_wheel
 
+    # build ray-wasm wheel
+    PATH="/usr/local/bin:/usr/local/sbin:/opt/python/${PYTHON}/bin:/root/bazel-3.2.0/output:$PATH" \
+    LIBCLANG_PATH="/lib64:${LIBCLANG_PATH-}" \
+    RAY_INSTALL_WASM=1 "/opt/python/${PYTHON}/bin/python" setup.py bdist_wheel
+
     # In the future, run auditwheel here.
     mv dist/*.whl ../.whl/
   )

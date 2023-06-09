@@ -23,8 +23,8 @@ function install_sdk() {
     fi
 
     wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-${OS}.tar.gz
+    rm -rf wasi-sdk-${WASI_VERSION_FULL}
     tar xf wasi-sdk-${WASI_VERSION_FULL}-${OS}.tar.gz
-
 }
 
 # /opt/wasi-sdk/bin/clang --target=wasm32-unknown-wasi \
@@ -34,7 +34,8 @@ function install_sdk() {
 
 WASI_SDK_PATH=$(pwd -P)/wasi-sdk-${WASI_VERSION_FULL}
 
-if [ ! -d "${WASI_SDK_PATH}" ]; then
+# check if wasi clang is installed
+if ! command -v "${WASI_SDK_PATH}/bin/clang" >/dev/null 2>&1; then
     echo "Installing WASI SDK..."
     install_sdk
     if [ ! -d "${WASI_SDK_PATH}" ]; then
@@ -46,10 +47,10 @@ fi
 export CC="${WASI_SDK_PATH}/bin/clang --sysroot=${WASI_SDK_PATH}/share/wasi-sysroot"
 
 $CC --target=wasm32-unknown-wasi \
+    -Wno-format-security \
     -Wl,--export-all \
     -I. \
     ./simple.c -o simple.wasm # -nostdlib
-
 
 # check if wabt is installed
 if ! [ -x "$(command -v wasm2wat)" ]; then
@@ -59,5 +60,5 @@ if ! [ -x "$(command -v wasm2wat)" ]; then
 else
     # if installed, generate wat files
     wasm2wat simple.wasm -o simple.wat
-    wasm-objdump -dhs simple.wasm > simple.objdump
+    wasm-objdump -dhs simple.wasm >simple.objdump
 fi

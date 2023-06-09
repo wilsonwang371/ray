@@ -191,7 +191,7 @@ if setup_spec.type == SetupType.RAY_CPP:
     ]
 
 if setup_spec.type == SetupType.RAY_WASM:
-    setup_spec.files_to_include += ["ray/wasm/default_worker" + exe_suffix]
+    setup_spec.files_to_include += ["ray/wasm/wasm_worker" + exe_suffix]
     # WASM API library and project template files.
     setup_spec.files_to_include += [
         os.path.join(dirpath, filename)
@@ -647,7 +647,7 @@ def build(build_python, build_java, build_cpp, build_wasm, verbose=False):
         bazel_flags.extend(["--config=tsan"])
 
     if verbose:
-        bazel_flags.extend(["--subcommands", "--verbose_failures"])
+        bazel_flags.extend(["--subcommands", "--verbose_failures", "--sandbox_debug"])
 
     return bazel_invoke(
         subprocess.check_call,

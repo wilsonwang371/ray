@@ -18,7 +18,7 @@ use std::{sync::RwLock, vec};
 
 use crate::engine::WasmEngine;
 use crate::runtime::{Base, ObjectID, RemoteFunctionHolder};
-use crate::util::{SerDesFactory, SerDesType};
+use crate::util::{RayLog, SerDesFactory, SerDesType};
 use crate::{
     engine::{Hostcalls, WasmContext, WasmType, WasmValue},
     runtime::RayRuntime,
@@ -78,6 +78,40 @@ enum RayBufferDataType {
     Invalid = 0x0,
     ObjectID = 0x1,
     Data = 0x2,
+}
+
+/// validate ray buffer pointer
+fn valid_ray_buffer_ptr(
+    ctx: &mut dyn WasmContext,
+    ray_buf_ptr: u32,
+) -> (bool, Option<RayBufferHolder>) {
+    let mut ray_buf = RayBufferHolder::new();
+
+    // make sure the magic code is correct
+    match ctx.get_memory_region(ray_buf_ptr as usize, RAY_BUF_SIZE) {
+        Ok(v) => {
+            // convert u8 array to u32 array
+            ray_buf.magic = u32::from_le_bytes([v[0], v[1], v[2], v[3]]);
+            if ray_buf.magic != RAY_BUF_MAGIC {
+                return (false, None);
+            }
+            ray_buf.data_type = u32::from_le_bytes([v[4], v[5], v[6], v[7]]);
+            ray_buf.flags = u32::from_le_bytes([v[8], v[9], v[10], v[11]]);
+            ray_buf.ptr = u32::from_le_bytes([v[12], v[13], v[14], v[15]]);
+            ray_buf.len = u32::from_le_bytes([v[16], v[17], v[18], v[19]]);
+            ray_buf.cap = u32::from_le_bytes([v[20], v[21], v[22], v[23]]);
+            ray_buf.checksum = u32::from_le_bytes([v[24], v[25], v[26], v[27]]);
+        }
+        Err(_) => {
+            return (false, None);
+        }
+    }
+
+    // verify checksum
+    if !ray_buf.is_valid() {
+        return (false, None);
+    }
+    return (true, Some(ray_buf));
 }
 
 fn ray_buffer_write_data(
@@ -223,7 +257,20 @@ pub fn register_ray_hostcalls(
 ) -> Result<()> {
     let mut hostcalls = Hostcalls::new("ray", runtime.clone());
     hostcalls
-        .add_hostcall("test", vec![], vec![], hc_ray_test)
+        .add_hostcall(
+            "log_write",
+            vec![WasmType::I32, WasmType::I32],
+            vec![WasmType::I32],
+            hc_ray_log_write,
+        )
+        .unwrap();
+    hostcalls
+        .add_hostcall(
+            "memregion_validate",
+            vec![WasmType::I32, WasmType::I32],
+            vec![WasmType::I32],
+            hc_ray_memregion_validate,
+        )
         .unwrap();
     hostcalls
         .add_hostcall("sleep", vec![WasmType::I32], vec![], hc_ray_sleep)
@@ -265,9 +312,45 @@ pub fn register_ray_hostcalls(
     Ok(())
 }
 
-pub fn hc_ray_test(_ctx: &mut dyn WasmContext, _params: &[WasmValue]) -> Result<Vec<WasmValue>> {
-    info!("test function called");
-    Ok(vec![])
+pub fn hc_ray_log_write(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec<WasmValue>> {
+    let msg_ptr = match &params[0] {
+        WasmValue::I32(v) => v.clone(),
+        _ => return Err(anyhow!("invalid param")),
+    };
+    let msg_len = match &params[1] {
+        WasmValue::I32(v) => v.clone(),
+        _ => return Err(anyhow!("invalid param")),
+    };
+    match ctx.get_memory_region(msg_ptr as usize, msg_len as usize) {
+        Ok(v) => unsafe {
+            let msg = String::from_utf8_unchecked(v.to_vec());
+            RayLog::info(&msg);
+            Ok(vec![WasmValue::I32(msg_len)])
+        },
+        Err(_) => Ok(vec![WasmValue::I32(0)]),
+    }
+}
+
+/// validate memory region
+/// params[0]: memory region pointer
+/// params[1]: memory region length
+/// return 0 if mem region is valid, -1 if invalid
+pub fn hc_ray_memregion_validate(
+    ctx: &mut dyn WasmContext,
+    params: &[WasmValue],
+) -> Result<Vec<WasmValue>> {
+    let ptr = match &params[0] {
+        WasmValue::I32(v) => v.clone(),
+        _ => return Err(anyhow!("invalid param")),
+    };
+    let len = match &params[1] {
+        WasmValue::I32(v) => v.clone(),
+        _ => return Err(anyhow!("invalid param")),
+    };
+    match ctx.get_memory_region(ptr as usize, len as usize) {
+        Ok(_) => Ok(vec![WasmValue::I32(0)]),
+        Err(_) => Ok(vec![WasmValue::I32(1)]),
+    }
 }
 
 pub fn hc_ray_sleep(_ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec<WasmValue>> {
@@ -512,7 +595,7 @@ pub fn hc_ray_put(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec
 /// params[2]: function arguments buffer pointer
 /// return 0 if success, -1 if failed
 pub fn hc_ray_call(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec<WasmValue>> {
-    info!("ray_call: {:x?}", params);
+    info!("ray_call: {:#x?}", params);
     let ray_buf_ptr = match &params[0] {
         WasmValue::I32(v) => v.clone(),
         _ => return Err(anyhow!("invalid param")),
@@ -539,42 +622,89 @@ pub fn hc_ray_call(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Ve
         _ => return Err(anyhow!("invalid param")),
     };
 
-    let mut updated_obj_id: Vec<u8> = Vec::new();
-    match ctx.get_memory_region(args_ptr as usize, func.params_data_size().unwrap()) {
+    let mut argsize: usize = 0;
+    for i in 0..func.params_count() {
+        match func.param_data_size(i, true) {
+            Ok(v) => {
+                argsize += v;
+            }
+            Err(e) => {
+                error!("get param data size failed: {}", e);
+                return Ok(vec![WasmValue::I32(-1)]);
+            }
+        }
+    }
+
+    let args: Vec<WasmValue>;
+    match ctx.get_memory_region(args_ptr as usize, argsize) {
         Ok(v) => {
-            debug!(
+            info!(
                 "call: func_ref_val: {}, args_ptr: {:#08x} content: {:x?}",
                 func_ref_val, args_ptr, v
             );
-            let args = func.params_convert(v).unwrap();
-            debug!("call: args: {:x?}", args);
-
-            let remote_func = RemoteFunctionHolder::new_from_func(func);
-            let result = ctx.invoke(&remote_func, args.as_slice());
-            match result {
-                Ok(v) => {
-                    if v.len() != 1 {
-                        error!("call: invalid return value");
-                        return Ok(vec![WasmValue::I32(-1)]);
-                    }
-                    info!("call: return value: {:x?}", v);
-                    // make sure object id data length can fit into the
-                    // memory region
-                    if ray_buf.cap < v[0].id.len() as u32 {
-                        error!("call: invalid return value");
-                        return Ok(vec![WasmValue::I32(-1)]);
-                    }
-                    updated_obj_id.resize(v[0].id.len() as usize, 0);
-                    updated_obj_id[..v[0].id.len() as usize].copy_from_slice(&v[0].id);
-                }
-                Err(e) => {
-                    error!("call: error: {:?}", e);
-                    return Ok(vec![WasmValue::I32(-1)]);
-                }
-            }
+            args = func.params_convert(v, true).unwrap();
         }
         Err(e) => {
             error!("cannot access memory region: {}", e);
+            return Ok(vec![WasmValue::I32(-1)]);
+        }
+    }
+    debug!("call: args: {:x?}", args);
+
+    let mut updated_args: Vec<WasmValue> = vec![];
+    for i in 0..args.len() {
+        match args[i] {
+            WasmValue::I32(v) => {
+                info!("call: arg[{}]: I32: {}", i, v);
+                match valid_ray_buffer_ptr(ctx, v as u32) {
+                    (true, Some(v)) => {
+                        info!("valid ray buffer: {:x?}", v);
+                        match load_buffer(ctx, v.ptr, v.len) {
+                            Ok(v) => {
+                                debug!("call: arg[{}]: Buffer: {:x?}", i, v);
+                                updated_args.push(WasmValue::Buffer(
+                                    v.as_slice().to_vec().into_boxed_slice(),
+                                ));
+                                continue;
+                            }
+                            Err(e) => {
+                                error!("load buffer failed: {}", e);
+                                return Ok(vec![WasmValue::I32(-1)]);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            WasmValue::I64(v) => {
+                debug!("call: arg[{}]: I64: {}", i, v);
+            }
+            _ => {}
+        }
+        updated_args.push(args[i].clone());
+    }
+
+    let mut updated_obj_id: Vec<u8> = Vec::new();
+    let remote_func = RemoteFunctionHolder::new_from_func(func);
+    let result = ctx.invoke(&remote_func, updated_args.as_slice());
+    match result {
+        Ok(v) => {
+            if v.len() != 1 {
+                error!("call: invalid return value");
+                return Ok(vec![WasmValue::I32(-1)]);
+            }
+            info!("call: return value: {:x?}", v);
+            // make sure object id data length can fit into the
+            // memory region
+            if ray_buf.cap < v[0].id.len() as u32 {
+                error!("call: invalid return value");
+                return Ok(vec![WasmValue::I32(-1)]);
+            }
+            updated_obj_id.resize(v[0].id.len() as usize, 0);
+            updated_obj_id[..v[0].id.len() as usize].copy_from_slice(&v[0].id);
+        }
+        Err(e) => {
+            error!("call: error: {:?}", e);
             return Ok(vec![WasmValue::I32(-1)]);
         }
     }

@@ -14,9 +14,9 @@
 
 use crate::engine::{WasmType, WasmValue};
 
-use wasmedge_types::ValType;
-
+use libc::memcpy;
 use wasmedge_sys as sys;
+use wasmedge_types::ValType;
 
 pub fn wasmedgetype_to_wasmtype(t: &ValType) -> WasmType {
     match t {
@@ -39,6 +39,7 @@ pub fn wasmtype_to_wasmedgetype(t: &WasmType) -> ValType {
         WasmType::V128 => ValType::V128,
         WasmType::ExternRef => ValType::ExternRef,
         WasmType::FuncRef => ValType::FuncRef,
+        WasmType::Buffer => ValType::I32,
     }
 }
 
@@ -46,22 +47,60 @@ pub fn from_wasmedge_value(val: &sys::WasmValue) -> WasmValue {
     match val.ty() {
         ValType::I32 => WasmValue::I32(val.to_i32()),
         ValType::I64 => WasmValue::I64(val.to_i64()),
-        ValType::F32 => WasmValue::F32(val.to_f32() as u32),
-        ValType::F64 => WasmValue::F64(val.to_f64() as u64),
+        ValType::F32 => {
+            let mut buf = [0u8; 4];
+            unsafe {
+                memcpy(
+                    buf.as_mut_ptr() as *mut libc::c_void,
+                    val.to_f32().to_le_bytes().as_ptr() as *const libc::c_void,
+                    4,
+                );
+            }
+            WasmValue::F32(unsafe { std::mem::transmute(buf) })
+        }
+        ValType::F64 => {
+            let mut buf = [0u8; 8];
+            unsafe {
+                memcpy(
+                    buf.as_mut_ptr() as *mut libc::c_void,
+                    val.to_f64().to_le_bytes().as_ptr() as *const libc::c_void,
+                    8,
+                );
+            }
+            WasmValue::F64(unsafe { std::mem::transmute(buf) })
+        }
         ValType::V128 => WasmValue::V128(val.to_v128() as u128),
         ValType::FuncRef => unimplemented!("FuncRef"),
         ValType::ExternRef => unimplemented!("ExternRef"),
     }
 }
 
-pub fn to_wasmedge_value(val: &WasmValue) -> sys::WasmValue {
+pub fn to_wasmedge_value(val: &WasmValue) -> (sys::WasmValue, Option<Box<[u8]>>) {
     match val {
-        WasmValue::I32(v) => sys::WasmValue::from_i32(*v),
-        WasmValue::I64(v) => sys::WasmValue::from_i64(*v),
-        WasmValue::F32(v) => sys::WasmValue::from_f32(*v as f32),
-        WasmValue::F64(v) => sys::WasmValue::from_f64(*v as f64),
-        WasmValue::V128(v) => sys::WasmValue::from_v128(*v as i128),
+        WasmValue::I32(v) => (sys::WasmValue::from_i32(*v), None),
+        WasmValue::I64(v) => (sys::WasmValue::from_i64(*v), None),
+        WasmValue::F32(v) => {
+            let mut buf = [0u8; 4];
+            buf.copy_from_slice(&v.to_le_bytes());
+            (
+                sys::WasmValue::from_f32(unsafe { std::mem::transmute(buf) }),
+                None,
+            )
+        }
+        WasmValue::F64(v) => {
+            let mut buf = [0u8; 8];
+            buf.copy_from_slice(&v.to_le_bytes());
+            (
+                sys::WasmValue::from_f64(unsafe { std::mem::transmute(buf) }),
+                None,
+            )
+        }
+        WasmValue::V128(v) => (sys::WasmValue::from_v128(*v as i128), None),
         WasmValue::FuncRef(_) => unimplemented!("FuncRef"),
         WasmValue::ExternRef(_) => unimplemented!("ExternRef"),
+        WasmValue::Buffer(v) => (
+            sys::WasmValue::from_i32(0 as i32),
+            Some(v.to_vec().into_boxed_slice()),
+        ),
     }
 }

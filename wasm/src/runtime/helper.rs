@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use anyhow::{anyhow, Result};
-use libc::c_char;
 use core::panic;
+use libc::c_char;
 use prost::Message;
 use std::ffi::CStr;
 use std::process::Command;
@@ -38,7 +38,6 @@ pub struct ClusterHelper {}
 
 impl ClusterHelper {
     pub fn do_init() -> Result<()> {
-        // TODO: nothing to do for now
         Ok(())
     }
 

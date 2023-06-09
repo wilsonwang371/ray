@@ -29,3 +29,6 @@ sha256 = "1.1.3"
 [[bin]]
 name = "wasm_worker"
 path = "src/cmd/wasm_worker.rs"
+
+[build-dependencies]
+prost-build = "0.11.9"

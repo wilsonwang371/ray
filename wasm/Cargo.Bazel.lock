@@ -1,5 +1,5 @@
 {
-  "checksum": "06a9154b7e6ba5ed4631e7b0e83b90dcb931a76a40f08825a186209d12ad003c",
+  "checksum": "e63c1ac4190e81a8fb2e5f815aaaaa1763fa73870a5a4f8863aa1f09e1f4e1ba",
   "crates": {
     "addr2line 0.19.0": {
       "name": "addr2line",
@@ -6125,13 +6125,13 @@
       },
       "license": "MIT OR Apache-2.0"
     },
-    "prost 0.11.8": {
+    "prost 0.11.9": {
       "name": "prost",
-      "version": "0.11.8",
+      "version": "0.11.9",
       "repository": {
         "Http": {
-          "url": "https://crates.io/api/v1/crates/prost/0.11.8/download",
-          "sha256": "e48e50df39172a3e7eb17e14642445da64996989bc212b583015435d39a58537"
+          "url": "https://crates.io/api/v1/crates/prost/0.11.9/download",
+          "sha256": "0b82eaa1d779e9a4bc1c3217db8ffbeabaae1dca241bf70183242128d48681cd"
         }
       },
       "targets": [
@@ -6168,23 +6168,23 @@
         "proc_macro_deps": {
           "common": [
             {
-              "id": "prost-derive 0.11.8",
+              "id": "prost-derive 0.11.9",
               "target": "prost_derive"
             }
           ],
           "selects": {}
         },
-        "version": "0.11.8"
+        "version": "0.11.9"
       },
       "license": "Apache-2.0"
     },
-    "prost-build 0.11.8": {
+    "prost-build 0.11.9": {
       "name": "prost-build",
-      "version": "0.11.8",
+      "version": "0.11.9",
       "repository": {
         "Http": {
-          "url": "https://crates.io/api/v1/crates/prost-build/0.11.8/download",
-          "sha256": "2c828f93f5ca4826f97fedcbd3f9a536c16b12cff3dbbb4a007f932bbad95b12"
+          "url": "https://crates.io/api/v1/crates/prost-build/0.11.9/download",
+          "sha256": "119533552c9a7ffacc21e099c24a0ac8bb19c2a2a3f363de84cd9b844feab270"
         }
       },
       "targets": [
@@ -6244,11 +6244,11 @@
               "target": "prettyplease"
             },
             {
-              "id": "prost 0.11.8",
+              "id": "prost 0.11.9",
               "target": "prost"
             },
             {
-              "id": "prost-types 0.11.8",
+              "id": "prost-types 0.11.9",
               "target": "prost_types"
             },
             {
@@ -6271,17 +6271,17 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.11.8"
+        "version": "0.11.9"
       },
       "license": "Apache-2.0"
     },
-    "prost-derive 0.11.8": {
+    "prost-derive 0.11.9": {
       "name": "prost-derive",
-      "version": "0.11.8",
+      "version": "0.11.9",
       "repository": {
         "Http": {
-          "url": "https://crates.io/api/v1/crates/prost-derive/0.11.8/download",
-          "sha256": "4ea9b0f8cbe5e15a8a042d030bd96668db28ecb567ec37d691971ff5731d2b1b"
+          "url": "https://crates.io/api/v1/crates/prost-derive/0.11.9/download",
+          "sha256": "e5d2d8d10f3c6ded6da8b05b5fb3b8a5082514344d56c9f871412d29b4e075b4"
         }
       },
       "targets": [
@@ -6326,17 +6326,17 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.11.8"
+        "version": "0.11.9"
       },
       "license": "Apache-2.0"
     },
-    "prost-types 0.11.8": {
+    "prost-types 0.11.9": {
       "name": "prost-types",
-      "version": "0.11.8",
+      "version": "0.11.9",
       "repository": {
         "Http": {
-          "url": "https://crates.io/api/v1/crates/prost-types/0.11.8/download",
-          "sha256": "379119666929a1afd7a043aa6cf96fa67a6dce9af60c88095a4686dbce4c9c88"
+          "url": "https://crates.io/api/v1/crates/prost-types/0.11.9/download",
+          "sha256": "213622a1460818959ac1181aaeb2dc9c7f63df720db7d788b3e24eacd1983e13"
         }
       },
       "targets": [
@@ -6362,14 +6362,14 @@
         "deps": {
           "common": [
             {
-              "id": "prost 0.11.8",
+              "id": "prost 0.11.9",
               "target": "prost"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.11.8"
+        "version": "0.11.9"
       },
       "license": "Apache-2.0"
     },
@@ -10073,15 +10073,15 @@
               "target": "libc"
             },
             {
-              "id": "prost 0.11.8",
+              "id": "prost 0.11.9",
               "target": "prost"
             },
             {
-              "id": "prost-build 0.11.8",
+              "id": "prost-build 0.11.9",
               "target": "prost_build"
             },
             {
-              "id": "prost-types 0.11.8",
+              "id": "prost-types 0.11.9",
               "target": "prost_types"
             },
             {
@@ -10158,7 +10158,16 @@
       "build_script_attrs": {
         "data_glob": [
           "**"
-        ]
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "prost-build 0.11.9",
+              "target": "prost_build"
+            }
+          ],
+          "selects": {}
+        }
       },
       "license": null
     },

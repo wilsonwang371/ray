@@ -460,7 +460,7 @@ impl WasmEngine for WasmtimeEngine {
             Some(rx) => match rx.recv_timeout(Duration::from_millis(100)) {
                 Ok(task) => {
                     RayLog::info(
-                        format!("task_loop_once: executing wasm task: {:?}", task).as_str(),
+                        format!("task_loop_once: executing wasm task: {:#x?}", task).as_str(),
                     );
                     let mod_name = task.module_name.as_str();
                     let func_name = task.func_name.as_str();
@@ -510,7 +510,8 @@ impl WasmEngine for WasmtimeEngine {
                     match self.execute("sandbox", "instance", func_name, args) {
                         Ok(results) => {
                             RayLog::info(
-                                format!("task_loop_once: wasm task result: {:?}", results).as_str(),
+                                format!("task_loop_once: wasm task result: {:#x?}", results)
+                                    .as_str(),
                             );
 
                             if results.len() != 1 {
@@ -551,8 +552,11 @@ impl WasmEngine for WasmtimeEngine {
             Some(tx) => {
                 if result_buf.len() != 0 {
                     RayLog::info(
-                        format!("task_loop_once: sending wasm task result: {:?}", result_buf)
-                            .as_str(),
+                        format!(
+                            "task_loop_once: sending wasm task result: {:#x?}",
+                            result_buf
+                        )
+                        .as_str(),
                     );
                     tx.send(Ok(result_buf)).unwrap();
                 } else {

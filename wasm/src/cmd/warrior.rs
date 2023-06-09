@@ -27,7 +27,7 @@ use std::sync::{Arc, RwLock};
 use tracing_subscriber;
 
 #[allow(dead_code)]
-struct RayWaContext {
+struct WarriorContext {
     // ray runtime
     runtime: Arc<RwLock<Box<dyn runtime::RayRuntime + Send + Sync>>>,
 
@@ -41,20 +41,20 @@ struct RayWaContext {
     config: config::ConfigInternal,
 }
 
-struct RayWaContextFactory {}
+struct WarriorContextFactory {}
 
-impl RayWaContextFactory {
-    pub async fn create_context(params: &LauncherParameters) -> Result<RayWaContext> {
+impl WarriorContextFactory {
+    pub async fn create_context(params: &LauncherParameters) -> Result<WarriorContext> {
         let cfg = runtime::RayConfig::new();
         let mut internal_cfg = config::ConfigInternal::new();
 
         internal_cfg.init(&cfg, &WorkerParameters::new_empty());
 
-        let wasm_engine = RayWaContextFactory::create_engine(params.engine_type.clone());
-        let ray_runtime = RayWaContextFactory::create_runtime(internal_cfg.clone());
+        let wasm_engine = WarriorContextFactory::create_engine(params.engine_type.clone());
+        let ray_runtime = WarriorContextFactory::create_runtime(internal_cfg.clone());
         let (wasm_engine, ray_runtime) = tokio::join!(wasm_engine, ray_runtime);
 
-        let context = RayWaContext {
+        let context = WarriorContext {
             runtime: Arc::new(RwLock::new(ray_runtime.unwrap())),
             engine: Arc::new(RwLock::new(wasm_engine.unwrap())),
             params: params.clone(),
@@ -97,7 +97,7 @@ impl RayWaContextFactory {
 }
 
 async fn run_binary(args: &LauncherParameters) -> Result<()> {
-    let ctx = RayWaContextFactory::create_context(&args);
+    let ctx = WarriorContextFactory::create_context(&args);
 
     // check if wasm file exists
     let wasm_file = std::path::Path::new(&args.file);

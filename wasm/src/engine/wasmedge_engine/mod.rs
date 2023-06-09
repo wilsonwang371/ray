@@ -30,7 +30,7 @@ use std::collections::HashMap;
 use std::result::Result::Ok;
 use std::sync::{Arc, Mutex, RwLock};
 
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use wasmedge_macro::sys_host_function;
 use wasmedge_sys::{
@@ -62,7 +62,15 @@ macro_rules! hostcall_wrapper {
                 Ok(rets) => {
                     let mut results = vec![];
                     for ret in rets.iter() {
-                        results.push(to_wasmedge_value(ret));
+                        let (v, data) = to_wasmedge_value(ret);
+                        match data {
+                            Some(_) => {
+                                RayLog::error("RayBuffer return is not supported");
+                                return Err(HostFuncError::Runtime(1));
+                            }
+                            None => {}
+                        }
+                        results.push(v);
                     }
                     return Ok(results);
                 }
@@ -77,7 +85,8 @@ macro_rules! hostcall_wrapper {
 type WasmEdgeHostCallType =
     fn(CallingFrame, Vec<WasmEdgeWasmValue>) -> Result<Vec<WasmEdgeWasmValue>, HostFuncError>;
 
-hostcall_wrapper!(hc_ray_test);
+hostcall_wrapper!(hc_ray_log_write);
+hostcall_wrapper!(hc_ray_memregion_validate);
 hostcall_wrapper!(hc_ray_sleep);
 hostcall_wrapper!(hc_ray_init);
 hostcall_wrapper!(hc_ray_shutdown);
@@ -96,7 +105,8 @@ struct CurrentTaskInfo {
 lazy_static! {
     static ref HOSTCALLS: HashMap<&'static str, WasmEdgeHostCallType> = {
         let mut m: HashMap<&str, WasmEdgeHostCallType> = HashMap::new();
-        m.insert("test", hc_ray_test);
+        m.insert("log_write", hc_ray_log_write);
+        m.insert("memregion_validate", hc_ray_memregion_validate);
         m.insert("sleep", hc_ray_sleep);
         m.insert("init", hc_ray_init);
         m.insert("shutdown", hc_ray_shutdown);
@@ -307,13 +317,78 @@ impl WasmEngine for WasmEdgeEngine {
             }
         };
 
+        let instance = sandbox.instances.get(instance_name).unwrap();
+
+        let mut allocated_mem_list = vec![];
+
         let args = args
             .iter()
-            .map(|arg| to_wasmedge_value(arg))
-            .collect::<Vec<WasmEdgeWasmValue>>();
+            .map(|arg| match to_wasmedge_value(arg) {
+                (v, None) => Ok(v),
+                (_, Some(data)) => {
+                    // save data to sandbox and use the pointer as argument
+                    match instance.instance.get_func("__war_malloc") {
+                        Ok(func) => {
+                            match sandbox.executor.call_func(
+                                &func,
+                                vec![WasmEdgeWasmValue::from_i32(data.len() as i32)],
+                            ) {
+                                Ok(rtn) => match rtn.len() {
+                                    1 => match rtn[0].to_i32() {
+                                        0 => {
+                                            return Err(anyhow!("Failed to allocate memory"));
+                                        }
+                                        ptr => match instance.instance.get_memory("memory") {
+                                            Ok(mut mem) => {
+                                                // add the new allocated memory into the list
+                                                // so that we can free it later
+                                                allocated_mem_list.push(ptr);
 
-        let instance = sandbox.instances.get(instance_name).unwrap();
-        match func_name.parse::<u32>() {
+                                                // copy data to wasm memory so that wasm function
+                                                // can access it
+                                                match mem.set_data(data.as_ref(), ptr as u32) {
+                                                    Ok(_) => {
+                                                        return Ok(WasmEdgeWasmValue::from_i32(
+                                                            ptr,
+                                                        ));
+                                                    }
+                                                    Err(_) => {
+                                                        return Err(anyhow!(
+                                                            "Failed to set memory"
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                            Err(_) => {
+                                                return Err(anyhow!("Failed to get memory"));
+                                            }
+                                        },
+                                    },
+                                    _ => {
+                                        return Err(anyhow!("Invalid return value"));
+                                    }
+                                },
+                                Err(e) => {
+                                    return Err(anyhow!("Failed to allocate memory: {:?}", e));
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            return Err(anyhow!("Failed to allocate memory"));
+                        }
+                    }
+                }
+            })
+            .collect::<Result<Vec<WasmEdgeWasmValue>>>();
+
+        let args = match args {
+            Ok(args) => args,
+            Err(e) => {
+                return Err(anyhow!("Failed to convert arguments: {:?}", e));
+            }
+        };
+
+        let res = match func_name.parse::<u32>() {
             Ok(idx) => match instance.instance.get_table("__indirect_function_table") {
                 Ok(table) => match table.get_data(idx) {
                     Ok(val) => match val.func_ref() {
@@ -323,24 +398,19 @@ impl WasmEngine for WasmEdgeEngine {
                                     .iter()
                                     .map(|x| from_wasmedge_value(x))
                                     .collect::<Vec<WasmValue>>();
-                                return Ok(results);
+                                // TODO: remember to free allocated variable
+                                Ok(results)
                             }
                             Err(e) => {
                                 info!("Failed to run function: {:?}", e);
-                                return Err(anyhow!("Failed to run function"));
+                                Err(anyhow!("Failed to run function"))
                             }
                         },
-                        None => {
-                            return Err(anyhow!("Failed to get function"));
-                        }
+                        None => Err(anyhow!("Failed to get function")),
                     },
-                    Err(_) => {
-                        return Err(anyhow!("Failed to get function"));
-                    }
+                    Err(_) => Err(anyhow!("Failed to get function")),
                 },
-                Err(_) => {
-                    return Err(anyhow!("Failed to get table"));
-                }
+                Err(_) => Err(anyhow!("Failed to get table")),
             },
             Err(_) => {
                 let func = instance
@@ -350,29 +420,51 @@ impl WasmEngine for WasmEdgeEngine {
                 match sandbox.executor.call_func(&func, args) {
                     Ok(rtn) => match rtn.len() {
                         0 => {
-                            info!("Completed executing function \"{}\"", func_name);
-                            return Ok(vec![]);
+                            debug!("Completed executing function \"{}\"", func_name);
+                            Ok(vec![])
                         }
                         1 => {
                             let val = rtn[0].to_i32();
                             if val != 0 {
                                 return Err(anyhow!("Failed to run function"));
                             }
-                            info!("Completed executing function \"{}\"", func_name);
-                            return Ok(vec![WasmValue::I32(val)]);
+                            debug!("Completed executing function \"{}\"", func_name);
+                            Ok(vec![WasmValue::I32(val)])
                         }
                         _ => {
                             info!("Invalid return value. {}", rtn.len());
-                            return Err(anyhow!("Invalid return value"));
+                            Err(anyhow!("Invalid return value"))
                         }
                     },
                     Err(e) => {
                         info!("Failed to run function: {:?}", e);
-                        return Err(anyhow!("Failed to run function"));
+                        Err(anyhow!("Failed to run function"))
                     }
                 }
             }
+        };
+
+        // free allocated memory
+        for ptr in allocated_mem_list.iter() {
+            match instance.instance.get_func("__war_free") {
+                Ok(func) => {
+                    match sandbox
+                        .executor
+                        .call_func(&func, vec![WasmEdgeWasmValue::from_i32(*ptr as i32)])
+                    {
+                        Ok(_) => {}
+                        Err(e) => {
+                            return Err(anyhow!("Failed to free memory: {:?}", e));
+                        }
+                    }
+                }
+                Err(_) => {
+                    return Err(anyhow!("Cannot find __war_free"));
+                }
+            }
         }
+
+        res
     }
 
     fn has_instance(&self, sandbox_name: &str, instance_name: &str) -> Result<bool> {
@@ -426,9 +518,9 @@ impl WasmEngine for WasmEdgeEngine {
         match TASK_RECEIVER.lock().ok().unwrap().as_ref() {
             Some(rx) => match rx.recv_timeout(Duration::from_millis(100)) {
                 Ok(task) => {
-                    RayLog::info(
-                        format!("task_loop_once: executing wasm task: {:?}", task).as_str(),
-                    );
+                    // RayLog::info(
+                    //     format!("task_loop_once: executing wasm task: {:#x?}", task).as_str(),
+                    // );
                     let mod_name = task.module_name.as_str();
                     let func_name = task.func_name.as_str();
                     let args = task.args;
@@ -478,7 +570,8 @@ impl WasmEngine for WasmEdgeEngine {
                     match self.execute("sandbox", "instance", func_name, args) {
                         Ok(results) => {
                             RayLog::info(
-                                format!("task_loop_once: wasm task result: {:?}", results).as_str(),
+                                format!("task_loop_once: wasm task result: {:#x?}", results)
+                                    .as_str(),
                             );
 
                             if results.len() != 1 {
@@ -505,7 +598,6 @@ impl WasmEngine for WasmEdgeEngine {
                     }
                 }
                 Err(_) => {
-                    RayLog::error("timeout");
                     return Ok(()); // timeout
                 }
             },
@@ -520,8 +612,11 @@ impl WasmEngine for WasmEdgeEngine {
             Some(tx) => {
                 if result_buf.len() != 0 {
                     RayLog::info(
-                        format!("task_loop_once: sending wasm task result: {:?}", result_buf)
-                            .as_str(),
+                        format!(
+                            "task_loop_once: sending wasm task result: {:#x?}",
+                            result_buf
+                        )
+                        .as_str(),
                     );
                     tx.send(Ok(result_buf)).unwrap();
                 } else {

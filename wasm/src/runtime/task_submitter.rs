@@ -27,7 +27,7 @@ use crate::{
 };
 use core::panic;
 use std::collections::HashMap;
-use tracing::info;
+use tracing::debug;
 
 use super::core::core_worker::{CoreWorker_GetActor, RayFunction};
 
@@ -273,7 +273,7 @@ impl TaskSubmitter for NativeTaskSubmitter {
                 bufs.push(arg.as_msgpack_vec().unwrap());
             });
             // print the buffer
-            info!("bufs: {:x?}", bufs);
+            debug!("bufs: {:#x?}", bufs);
             for buf in bufs.iter() {
                 let rtn = TaskArg_Vec_PushByValue(
                     task_args,

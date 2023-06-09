@@ -124,6 +124,8 @@ build_wheel_windows() {
       python setup.py --quiet bdist_wheel
       # build ray-cpp wheel
       RAY_INSTALL_CPP=1 python setup.py --quiet bdist_wheel
+      # build ray-wasm wheel
+      RAY_INSTALL_WASM=1 python setup.py --quiet bdist_wheel
       uninstall_ray
     )
   done

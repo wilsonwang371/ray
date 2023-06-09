@@ -25,8 +25,11 @@ use crate::{engine::wasmedge_engine::WasmEdgeEngine, runtime::RayRuntime};
 use anyhow::{anyhow, Result};
 use core::result::Result::Ok;
 use lazy_static::lazy_static;
-use rmp::decode::{read_i32, read_i64, read_u32, read_u64};
-use rmp::encode::{write_i32, write_i64, write_u32, write_u64};
+use rmp::decode::{read_bin_len, read_f32, read_f64, read_i32, read_i64, read_marker};
+use rmp::encode::{write_bin, write_f32, write_f64, write_i32, write_i64};
+use rmp::Marker;
+
+use crate::util::RayLog;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 // a channel for sending task to wasm engine
@@ -119,7 +122,7 @@ impl WasmEngineFactory {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WasmValue {
     I32(i32),
     I64(i64),
@@ -128,6 +131,7 @@ pub enum WasmValue {
     V128(u128),
     FuncRef(usize),
     ExternRef(usize),
+    Buffer(Box<[u8]>),
 }
 
 impl WasmValue {
@@ -145,12 +149,19 @@ impl WasmValue {
             }
             WasmValue::F32(v) => {
                 let mut buf = Vec::new();
-                write_u32(&mut buf, *v).unwrap();
+                let v = f32::from_bits(*v);
+                write_f32(&mut buf, v).unwrap();
                 Ok(buf)
             }
             WasmValue::F64(v) => {
                 let mut buf = Vec::new();
-                write_u64(&mut buf, *v).unwrap();
+                let v = f64::from_bits(*v);
+                write_f64(&mut buf, v).unwrap();
+                Ok(buf)
+            }
+            WasmValue::Buffer(v) => {
+                let mut buf = Vec::new();
+                write_bin(&mut buf, v.as_ref()).unwrap();
                 Ok(buf)
             }
             _ => {
@@ -159,7 +170,84 @@ impl WasmValue {
         }
     }
 
-    pub fn from_msgpack_vec(ty: &WasmType, data: &[u8]) -> Result<WasmValue> {
+    pub fn from_msgpack_vec_array(buf_list: Vec<&[u8]>) -> Result<Vec<WasmValue>> {
+        let mut args: Vec<WasmValue> = vec![];
+        for arg_buf in buf_list {
+            // read message pack data from buffer
+            let marker_data = Vec::from(&arg_buf[0..1]);
+            match read_marker(&mut marker_data.as_slice()) {
+                Ok(m) => match m {
+                    Marker::I32 => match WasmValue::from_msgpack_vec(WasmType::I32, &arg_buf) {
+                        Ok(wasm_value) => {
+                            args.push(wasm_value);
+                            continue;
+                        }
+                        Err(e) => {
+                            RayLog::error(&format!("convert msgpack to WasmValue error: {}", e));
+                            return Err(anyhow!("convert msgpack to WasmValue error"));
+                        }
+                    },
+                    Marker::I64 => match WasmValue::from_msgpack_vec(WasmType::I64, &arg_buf) {
+                        Ok(wasm_value) => {
+                            args.push(wasm_value);
+                            continue;
+                        }
+                        Err(e) => {
+                            RayLog::error(&format!("convert msgpack to WasmValue error: {}", e));
+                            return Err(anyhow!("convert msgpack to WasmValue error"));
+                        }
+                    },
+                    Marker::F32 => match WasmValue::from_msgpack_vec(WasmType::F32, &arg_buf) {
+                        Ok(wasm_value) => {
+                            args.push(wasm_value);
+                            continue;
+                        }
+                        Err(e) => {
+                            RayLog::error(&format!("convert msgpack to WasmValue error: {}", e));
+                            return Err(anyhow!("convert msgpack to WasmValue error"));
+                        }
+                    },
+                    Marker::F64 => match WasmValue::from_msgpack_vec(WasmType::F64, &arg_buf) {
+                        Ok(wasm_value) => {
+                            args.push(wasm_value);
+                            continue;
+                        }
+                        Err(e) => {
+                            RayLog::error(&format!("convert msgpack to WasmValue error: {}", e));
+                            return Err(anyhow!("convert msgpack to WasmValue error"));
+                        }
+                    },
+                    Marker::Bin16 | Marker::Bin32 | Marker::Bin8 => {
+                        match WasmValue::from_msgpack_vec(WasmType::Buffer, &arg_buf) {
+                            Ok(wasm_value) => {
+                                // RayLog::info(&format!("decode incoming buffer: {:?}", wasm_value));
+                                args.push(wasm_value);
+                                continue;
+                            }
+                            Err(e) => {
+                                RayLog::error(&format!(
+                                    "convert msgpack to WasmValue error: {}",
+                                    e
+                                ));
+                                return Err(anyhow!("convert msgpack to WasmValue error"));
+                            }
+                        }
+                    }
+                    _ => {
+                        RayLog::error(&format!("unsupported marker: {:?}", m));
+                        return Err(anyhow!("unsupported marker"));
+                    }
+                },
+                Err(e) => {
+                    RayLog::error(&format!("read marker error: {:?}", e));
+                    return Err(anyhow!("read marker error"));
+                }
+            }
+        }
+        Ok(args)
+    }
+
+    pub fn from_msgpack_vec(ty: WasmType, data: &[u8]) -> Result<WasmValue> {
         match ty {
             WasmType::I32 => {
                 let mut buf = data;
@@ -173,13 +261,26 @@ impl WasmValue {
             }
             WasmType::F32 => {
                 let mut buf = data;
-                let val = read_u32(&mut buf).unwrap();
+                let val = read_f32(&mut buf).unwrap();
+                let val = f32::to_ne_bytes(val);
+                // convert [u8; 4] to u32
+                let val = u32::from_ne_bytes(val.try_into().unwrap());
                 Ok(WasmValue::F32(val))
             }
             WasmType::F64 => {
                 let mut buf = data;
-                let val = read_u64(&mut buf).unwrap();
+                let val = read_f64(&mut buf).unwrap();
+                let val = f64::to_ne_bytes(val);
+                // convert [u8; 8] to u64
+                let val = u64::from_ne_bytes(val.try_into().unwrap());
                 Ok(WasmValue::F64(val))
+            }
+            WasmType::Buffer => {
+                let mut buf = data;
+                let len = read_bin_len(&mut buf).unwrap();
+                // read len bytes
+                let val = buf[..len as usize].to_vec();
+                Ok(WasmValue::Buffer(val.into_boxed_slice()))
             }
             _ => {
                 return Err(anyhow!("unsupported argument type"));
@@ -197,6 +298,7 @@ pub enum WasmType {
     V128,
     FuncRef,
     ExternRef,
+    Buffer,
 }
 
 #[derive(Clone)]
@@ -240,8 +342,33 @@ impl WasmFunc {
         }
     }
 
+    /// Get the number of parameters
+    pub fn params_count(&self) -> usize {
+        self.params.len()
+    }
+
+    /// Get the size of the data at the given index
+    pub fn param_data_size(&self, idx: usize, promoted: bool) -> Result<usize> {
+        if idx >= self.params.len() {
+            return Err(anyhow!("invalid argument index"));
+        }
+        match self.params.get(idx).unwrap() {
+            WasmType::I32 => Ok(4),
+            WasmType::I64 => Ok(8),
+            WasmType::F32 => {
+                if !promoted {
+                    Ok(4)
+                } else {
+                    Ok(8)
+                }
+            }
+            WasmType::F64 => Ok(8),
+            _ => Err(anyhow!("unsupported argument type")),
+        }
+    }
+
     /// Get the size of the data needed by all the parameters
-    pub fn params_data_size(&self) -> Result<usize> {
+    pub fn param_data_total_size(&self) -> Result<usize> {
         let mut total_size = 0;
         for i in self.params.iter() {
             match i {
@@ -266,8 +393,8 @@ impl WasmFunc {
     }
 
     /// Create a vector of all the parsed parameters from raw memory data
-    pub fn params_convert(&self, data: &[u8]) -> Result<Vec<WasmValue>> {
-        if data.len() != self.params_data_size()? {
+    pub fn params_convert(&self, data: &[u8], promoted: bool) -> Result<Vec<WasmValue>> {
+        if data.len() < self.param_data_total_size()? {
             return Err(anyhow!("invalid data size"));
         }
         // iterate all arguments and put them into a arguments vector
@@ -294,13 +421,25 @@ impl WasmFunc {
                     param_offset += 8;
                 }
                 WasmType::F32 => {
+                    let val;
+                    if promoted {
+                        // convert 8 bytes to f64
+                        let tmp_val = f64::from_ne_bytes(
+                            data[param_offset..param_offset + 8].try_into().unwrap(),
+                        );
+                        // convert f64 to f32
+                        let tmp_val = tmp_val as f32;
+                        let tmp_data = tmp_val.to_ne_bytes();
+                        val = u32::from_ne_bytes(tmp_data.try_into().unwrap());
+                        param_offset += 8;
+                    } else {
+                        let tmp_data = &data[param_offset..param_offset + 4];
+                        val = u32::from_ne_bytes(tmp_data.try_into().unwrap());
+                        param_offset += 4;
+                    }
                     // convert 4 bytes to u32
-                    let val = u32::from_ne_bytes(
-                        data[param_offset..param_offset + 4].try_into().unwrap(),
-                    );
                     let arg = WasmValue::F32(val);
                     args.push(arg);
-                    param_offset += 4;
                 }
                 WasmType::F64 => {
                     // convert 8 bytes to u64

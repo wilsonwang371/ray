@@ -42,9 +42,9 @@ rust_library(
     ),
     crate_name = "wasm_on_ray",
     crate_root = "src/lib.rs",
-    # data = [
-    #     "wasmedge_pkg",
-    # ],
+    data = [
+        "wasmedge_pkg",
+    ],
     proc_macro_deps = [
         "@wasm_crate_index//:wasmedge-macro",
     ],
@@ -169,12 +169,12 @@ rust_binary(
 )
 
 rust_binary(
-    name = "raywa",
+    name = "warrior",
     srcs = [
-        "src/cmd/raywa.rs",
+        "src/cmd/warrior.rs",
     ],
-    crate_name = "raywa",
-    crate_root = "src/cmd/raywa.rs",
+    crate_name = "warrior",
+    crate_root = "src/cmd/warrior.rs",
     visibility = ["//visibility:public"],
     deps = [
         #":ray_wasm_lib.dylib",
@@ -195,7 +195,7 @@ genrule(
     name = "ray_wasm_pkg",
     srcs = [
         "wasm_worker",
-        "raywa",
+        "warrior",
         "libray_wasm.so",
         # "ray_wasm_lib.dylib",
     ] + select({
@@ -218,7 +218,7 @@ genrule(
         mkdir -p "$$PY_WASM_DIR/lib/" &&
         cp -f $(location wasm_worker) "$$PY_WASM_DIR/" &&
         cp -f $(location libray_wasm.so) "$$PY_WASM_DIR/lib/" &&
-        cp -f $(location raywa) "$$PY_WASM_DIR/" &&
+        cp -f $(location warrior) "$$PY_WASM_DIR/" &&
         """ +
           # cp -f $(location ray_wasm_lib.dylib) "$$PY_WASM_DIR/lib/" &&
           select({
@@ -229,7 +229,7 @@ genrule(
           """
         echo "$$WORK_DIR" > $@
     """,
-    local = 1,
+    local = True,
     visibility = ["//visibility:public"],
 )
 
@@ -270,11 +270,11 @@ genrule(
         (cp -RLuvf \"$$WASMEDGE_SRC_DIR/.\" \"$$WASMEDGE_TMP_DIR\" || true) &&
         if [ -d \"$$WASMEDGE_TMP_DIR/lib\" ]; then pushd $$WASMEDGE_TMP_DIR; ln -s \"./lib\" \"./lib64\"; fi &&
         (mv \"$$WASMEDGE_DIR\" \"$$WASMEDGE_DIR-old-$$RANDOM\" || true) &&
-        mv \"$$WASMEDGE_TMP_DIR\" \"$$WASMEDGE_DIR\" &&
+        (mv \"$$WASMEDGE_TMP_DIR\" \"$$WASMEDGE_DIR\" || true) &&
         (rm -rf \"$$WASMEDGE_DIR-old-*\" || true) &&
         echo "$$WASMEDGE_DIR" > $@
     """,
-    local = 1,
+    local = True,
     tags = [
         "no-cache",
     ],

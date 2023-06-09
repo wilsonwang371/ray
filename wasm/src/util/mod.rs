@@ -21,7 +21,7 @@ use crate::runtime::core_worker::{
 use anyhow::{anyhow, Result};
 use core::result::Result::Ok;
 
-use rmp::decode::{read_i32, read_i64, read_marker, read_u32, read_u64};
+use rmp::decode::{read_f32, read_f64, read_i32, read_i64, read_marker, read_u32, read_u64};
 use rmp::encode::write_bin;
 
 use rmp::Marker;
@@ -287,8 +287,16 @@ impl MsgPackSerDes {
                     let val = read_i64(&mut buf).unwrap();
                     Ok(val.to_ne_bytes().to_vec())
                 }
-                Marker::F32 => unimplemented!(),
-                Marker::F64 => unimplemented!(),
+                Marker::F32 => {
+                    let mut buf = data;
+                    let val = read_f32(&mut buf).unwrap();
+                    Ok(val.to_ne_bytes().to_vec())
+                }
+                Marker::F64 => {
+                    let mut buf = data;
+                    let val = read_f64(&mut buf).unwrap();
+                    Ok(val.to_ne_bytes().to_vec())
+                }
                 Marker::FixStr(_) => unimplemented!(),
                 Marker::Str8 => unimplemented!(),
                 Marker::Str16 => unimplemented!(),

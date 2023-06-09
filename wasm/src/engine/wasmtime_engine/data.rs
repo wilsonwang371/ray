@@ -24,6 +24,7 @@ pub fn to_wasmtime_raw_value(val: &WasmValue) -> ValRaw {
         WasmValue::V128(v) => ValRaw::v128(*v),
         WasmValue::ExternRef(v) => ValRaw::externref(*v),
         WasmValue::FuncRef(v) => ValRaw::funcref(*v),
+        _ => unimplemented!(),
     }
 }
 
@@ -48,6 +49,7 @@ pub fn from_wasmtime_raw_value(ty: &WasmType, val: &ValRaw) -> WasmValue {
         WasmType::V128 => WasmValue::V128(val.get_v128()),
         WasmType::ExternRef => WasmValue::ExternRef(val.get_externref()),
         WasmType::FuncRef => WasmValue::FuncRef(val.get_funcref()),
+        _ => unimplemented!(),
     }
 }
 
@@ -72,6 +74,7 @@ pub fn wasmtime_type(ty: &WasmType) -> wasmtime::ValType {
         WasmType::V128 => ValType::V128,
         WasmType::ExternRef => ValType::ExternRef,
         WasmType::FuncRef => ValType::FuncRef,
+        WasmType::Buffer => unimplemented!(),
     }
 }
 

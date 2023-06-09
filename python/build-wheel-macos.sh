@@ -103,6 +103,8 @@ for ((i=0; i<${#PY_MMS[@]}; ++i)); do
     $PYTHON_EXE setup.py bdist_wheel
     # build ray-cpp wheel
     RAY_INSTALL_CPP=1 $PYTHON_EXE setup.py bdist_wheel
+    # build ray-wasm wheel
+    RAY_INSTALL_WASM=1 $PYTHON_EXE setup.py bdist_wheel
     mv dist/*.whl ../.whl/
   popd
 done

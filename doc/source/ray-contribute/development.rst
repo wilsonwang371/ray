@@ -335,6 +335,7 @@ You can tweak the build with the following environment variables (when running `
 - ``RAY_INSTALL_JAVA``: If set and equal to ``1``, extra build steps will be executed
   to build java portions of the codebase
 - ``RAY_INSTALL_CPP``: If set and equal to ``1``, ``ray-cpp`` will be installed
+- ``RAY_INSTALL_WASM``: If set and equal to ``1``, ``ray-wasm`` will be installed
 - ``RAY_DISABLE_EXTRA_CPP``: If set and equal to ``1``, a regular (non -
   ``cpp``) build will not provide some ``cpp`` interfaces
 - ``SKIP_BAZEL_BUILD``: If set and equal to ``1``, no Bazel build steps will be

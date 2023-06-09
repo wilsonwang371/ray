@@ -154,6 +154,7 @@ Status ExecuteTask(
     const std::string &serialized_retry_exception_allowlist,
     std::vector<std::pair<ObjectID, std::shared_ptr<RayObject>>> *returns,
     std::vector<std::pair<ObjectID, std::shared_ptr<RayObject>>> *dynamic_returns,
+    std::vector<std::pair<ObjectID, bool>> *streaming_generator_returns,
     std::shared_ptr<ray::LocalMemoryBuffer> &creation_task_exception_pb_bytes,
     bool *is_retryable_error,
     std::string *is_application_error,
@@ -213,14 +214,6 @@ Status ExecuteTask(
         arg_data = reinterpret_cast<const char *>(arg->GetData()->Data());
         arg_data_size = arg->GetData()->Size();
       }
-      char buf[2048] = {0};
-      // print hex string
-      for (size_t j = 0; j < arg_data_size; j++) {
-        char tmp[6] = {0};
-        snprintf(tmp, sizeof(tmp), "%02x ", (unsigned char)arg_data[j]);
-        strcat(buf, tmp);
-      }
-      buf[sizeof(buf) - 1] = '\0';
 
       // allocate memory for args_buf_list[i]
       task_execution_info.args_buf_list[i] = (uint8_t *)malloc(arg_data_size);
