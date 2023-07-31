@@ -169,6 +169,22 @@ rust_binary(
 )
 
 rust_binary(
+    name = "faas_worker",
+    srcs = [
+        "src/cmd/faas_worker.rs",
+    ],
+    crate_name = "faas_worker",
+    crate_root = "src/cmd/faas_worker.rs",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ray_wasm_lib",
+        "@wasm_crate_index//:anyhow",
+        "@wasm_crate_index//:tokio",
+        "@wasm_crate_index//:hyper",
+    ],
+)
+
+rust_binary(
     name = "warrior",
     srcs = [
         "src/cmd/warrior.rs",
@@ -195,6 +211,7 @@ genrule(
     name = "ray_wasm_pkg",
     srcs = [
         "wasm_worker",
+        "faas_worker",
         "warrior",
         "libray_wasm.so",
         # "ray_wasm_lib.dylib",
@@ -217,6 +234,7 @@ genrule(
         rm -rf $$PY_WASM_DIR && 
         mkdir -p "$$PY_WASM_DIR/lib/" &&
         cp -f $(location wasm_worker) "$$PY_WASM_DIR/" &&
+        cp -f $(location faas_worker) "$$PY_WASM_DIR/" &&
         cp -f $(location libray_wasm.so) "$$PY_WASM_DIR/lib/" &&
         cp -f $(location warrior) "$$PY_WASM_DIR/" &&
         """ +
