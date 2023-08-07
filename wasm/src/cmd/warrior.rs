@@ -14,7 +14,10 @@
 use wasm_on_ray::config;
 use wasm_on_ray::engine;
 use wasm_on_ray::runtime;
+
+#[cfg(feature = "enable-ray-hostcalls")]
 use wasm_on_ray::runtime::register_ray_hostcalls;
+
 use wasm_on_ray::util::{
     LauncherParameters, WasmEngineTypeParam, WasmFileFormat, WorkerParameters,
 };
@@ -50,7 +53,19 @@ impl WarriorContextFactory {
 
         internal_cfg.init(&cfg, &WorkerParameters::new_empty());
 
-        let wasm_engine = WarriorContextFactory::create_engine(params.engine_type.clone());
+        // convert Vec<String> to Vec<&str>
+        let dirs: Vec<&str> = match &params.dirs {
+            Some(d) => d.iter().map(|s| s.as_str()).collect(),
+            None => vec![],
+        };
+
+        let args = match &params.args {
+            Some(v) => Some(v.as_str()),
+            None => None,
+        };
+
+        let wasm_engine =
+            WarriorContextFactory::create_engine(params.engine_type.clone(), args, dirs);
         let ray_runtime = WarriorContextFactory::create_runtime(internal_cfg.clone());
         let (wasm_engine, ray_runtime) = tokio::join!(wasm_engine, ray_runtime);
 
@@ -70,21 +85,25 @@ impl WarriorContextFactory {
             engine.init()?;
         }
 
-        // setup hostcalls
-        register_ray_hostcalls(&context.runtime, &context.engine)?;
-
+        #[cfg(feature = "enable-ray-hostcalls")]
+        {
+            // setup hostcalls
+            register_ray_hostcalls(&context.runtime, &context.engine)?;
+        }
         Ok(context)
     }
 
     async fn create_engine(
         engine_type: WasmEngineTypeParam,
+        cmdline: Option<&str>,
+        dirs: Vec<&str>,
     ) -> Result<Box<dyn engine::WasmEngine + Send + Sync>> {
         let engine_type = match engine_type {
             WasmEngineTypeParam::WASMEDGE => engine::WasmEngineType::WASMEDGE,
             WasmEngineTypeParam::WASMTIME => engine::WasmEngineType::WASMTIME,
             _ => unimplemented!(),
         };
-        let e = engine::WasmEngineFactory::create_engine(engine_type);
+        let e = engine::WasmEngineFactory::create_engine(engine_type, cmdline, dirs);
         Ok(e.unwrap())
     }
 

@@ -305,6 +305,24 @@ pub fn register_ray_hostcalls(
             hc_ray_call,
         )
         .unwrap();
+    // track malloc/free
+    hostcalls
+        .add_hostcall(
+            "track_malloc",
+            vec![WasmType::I32, WasmType::I32],
+            vec![WasmType::I32],
+            hc_ray_track_malloc,
+        )
+        .unwrap();
+    hostcalls
+        .add_hostcall(
+            "track_free",
+            vec![WasmType::I32],
+            vec![WasmType::I32],
+            hc_ray_track_free,
+        )
+        .unwrap();
+
     {
         let mut engine = engine.write().unwrap();
         engine.register_hostcalls(&hostcalls)?;
@@ -325,6 +343,7 @@ pub fn hc_ray_log_write(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Resu
         Ok(v) => unsafe {
             let msg = String::from_utf8_unchecked(v.to_vec());
             RayLog::info(&msg);
+            info!("{}", msg);
             Ok(vec![WasmValue::I32(msg_len)])
         },
         Err(_) => Ok(vec![WasmValue::I32(0)]),
@@ -394,7 +413,7 @@ pub fn hc_ray_shutdown(
 /// params[2]: result buffer length pointer
 /// return 0 if success, -1 if failed
 pub fn hc_ray_get(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec<WasmValue>> {
-    info!("ray_get: {:x?}", params);
+    debug!("ray_get: {:x?}", params);
     let obj_id_ptr = match &params[0] {
         WasmValue::I32(v) => v.clone(),
         _ => {
@@ -485,17 +504,19 @@ pub fn hc_ray_get(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec
         }
     }
 
-    match ctx.get_memory_region_mut(result_buf_ptr as usize, data.len()) {
-        Ok(v) => {
-            debug!(
-                "ray_get: result_buf_ptr: {:#08x} content: {:x?}",
-                result_buf_ptr, v
-            );
-            v.copy_from_slice(&data);
-        }
-        Err(e) => {
-            error!("cannot access memory region: {}", e);
-            return Ok(vec![WasmValue::I32(-1)]);
+    if data.len() != 0 {
+        match ctx.get_memory_region_mut(result_buf_ptr as usize, data.len()) {
+            Ok(v) => {
+                debug!(
+                    "ray_get: result_buf_ptr: {:#08x} content: {:x?}",
+                    result_buf_ptr, v
+                );
+                v.copy_from_slice(&data);
+            }
+            Err(e) => {
+                error!("cannot access memory region: {}", e);
+                return Ok(vec![WasmValue::I32(-1)]);
+            }
         }
     }
 
@@ -513,7 +534,7 @@ pub fn hc_ray_get(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec
         }
     }
 
-    info!(
+    debug!(
         "ray_get: write result {:x?} to buffer",
         load_buffer(ctx, result_buf_ptr as u32, data.len() as u32)
     );
@@ -526,7 +547,7 @@ pub fn hc_ray_get(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec
 /// params[2]: data length
 /// return 0 if success, -1 if failed
 pub fn hc_ray_put(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec<WasmValue>> {
-    info!("ray_put: {:x?}", params);
+    debug!("ray_put: {:x?}", params);
     let ray_buf_ptr = match &params[0] {
         WasmValue::I32(v) => v.clone(),
         _ => return Err(anyhow!("invalid param")),
@@ -585,7 +606,7 @@ pub fn hc_ray_put(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec
         error!("write object id buffer failed: {}", result.err().unwrap());
         return Ok(vec![WasmValue::I32(-1)]);
     }
-    info!("ray_put: returns object_id {:x?}", obj_id);
+    debug!("ray_put: returns object_id {:x?}", obj_id);
     Ok(vec![WasmValue::I32(0)])
 }
 
@@ -595,7 +616,7 @@ pub fn hc_ray_put(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec
 /// params[2]: function arguments buffer pointer
 /// return 0 if success, -1 if failed
 pub fn hc_ray_call(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Vec<WasmValue>> {
-    info!("ray_call: {:#x?}", params);
+    debug!("ray_call: {:#x?}", params);
     let ray_buf_ptr = match &params[0] {
         WasmValue::I32(v) => v.clone(),
         _ => return Err(anyhow!("invalid param")),
@@ -638,7 +659,7 @@ pub fn hc_ray_call(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Ve
     let args: Vec<WasmValue>;
     match ctx.get_memory_region(args_ptr as usize, argsize) {
         Ok(v) => {
-            info!(
+            debug!(
                 "call: func_ref_val: {}, args_ptr: {:#08x} content: {:x?}",
                 func_ref_val, args_ptr, v
             );
@@ -649,21 +670,44 @@ pub fn hc_ray_call(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Ve
             return Ok(vec![WasmValue::I32(-1)]);
         }
     }
-    debug!("call: args: {:x?}", args);
+    debug!("call: original args: {:x?}", args);
 
     let mut updated_args: Vec<WasmValue> = vec![];
     for i in 0..args.len() {
         match args[i] {
             WasmValue::I32(v) => {
-                info!("call: arg[{}]: I32: {}", i, v);
+                debug!("call: arg[{}]: I32: {}", i, v);
+
+                // check if it is a valid ray buffer pointer
                 match valid_ray_buffer_ptr(ctx, v as u32) {
                     (true, Some(v)) => {
-                        info!("valid ray buffer: {:x?}", v);
+                        debug!("valid ray buffer: {:x?}", v);
                         match load_buffer(ctx, v.ptr, v.len) {
                             Ok(v) => {
                                 debug!("call: arg[{}]: Buffer: {:x?}", i, v);
                                 updated_args.push(WasmValue::Buffer(
                                     v.as_slice().to_vec().into_boxed_slice(),
+                                ));
+                                continue;
+                            }
+                            Err(e) => {
+                                error!("load buffer failed: {}", e);
+                                return Ok(vec![WasmValue::I32(-1)]);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                // check if it is a pointer and send the buffer if needed.
+                match ctx.lookup_mem_alloc(v as u32) {
+                    Ok(len) => {
+                        debug!("valid mem alloc: {:x?}", len);
+                        match load_buffer(ctx, v as u32, len as u32) {
+                            Ok(data) => {
+                                debug!("call: arg[{}]: Buffer: {:x?}", i, data);
+                                updated_args.push(WasmValue::Buffer(
+                                    data.as_slice().to_vec().into_boxed_slice(),
                                 ));
                                 continue;
                             }
@@ -683,6 +727,7 @@ pub fn hc_ray_call(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Ve
         }
         updated_args.push(args[i].clone());
     }
+    debug!("call: updated args: {:x?}", updated_args);
 
     let mut updated_obj_id: Vec<u8> = Vec::new();
     let remote_func = RemoteFunctionHolder::new_from_func(func);
@@ -693,7 +738,7 @@ pub fn hc_ray_call(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Ve
                 error!("call: invalid return value");
                 return Ok(vec![WasmValue::I32(-1)]);
             }
-            info!("call: return value: {:x?}", v);
+            debug!("call: return value: {:x?}", v);
             // make sure object id data length can fit into the
             // memory region
             if ray_buf.cap < v[0].id.len() as u32 {
@@ -718,6 +763,53 @@ pub fn hc_ray_call(ctx: &mut dyn WasmContext, params: &[WasmValue]) -> Result<Ve
         Ok(_) => Ok(vec![WasmValue::I32(0)]),
         Err(e) => {
             error!("put: write data failed: {}", e);
+            Ok(vec![WasmValue::I32(-1)])
+        }
+    }
+}
+
+/// track malloc
+/// params[0]: malloc return pointer
+/// params[1]: malloc size
+/// return 0 if success, -1 if failed
+pub fn hc_ray_track_malloc(
+    ctx: &mut dyn WasmContext,
+    params: &[WasmValue],
+) -> Result<Vec<WasmValue>> {
+    debug!("ray_track_malloc: {:x?}", params);
+    let ptr = match &params[0] {
+        WasmValue::I32(v) => v.clone() as u32,
+        _ => return Err(anyhow!("invalid param")),
+    };
+    let size = match &params[1] {
+        WasmValue::I32(v) => v.clone() as usize,
+        _ => return Err(anyhow!("invalid param")),
+    };
+    match ctx.track_mem_ops(ptr, size, false) {
+        Ok(_) => Ok(vec![WasmValue::I32(0)]),
+        Err(e) => {
+            error!("track malloc failed: {}", e);
+            Ok(vec![WasmValue::I32(-1)])
+        }
+    }
+}
+
+/// track free
+/// params[0]: free pointer
+/// return 0 if success, -1 if failed
+pub fn hc_ray_track_free(
+    ctx: &mut dyn WasmContext,
+    params: &[WasmValue],
+) -> Result<Vec<WasmValue>> {
+    debug!("ray_track_free: {:x?}", params);
+    let ptr = match &params[0] {
+        WasmValue::I32(v) => v.clone() as u32,
+        _ => return Err(anyhow!("invalid param")),
+    };
+    match ctx.track_mem_ops(ptr, 0, true) {
+        Ok(_) => Ok(vec![WasmValue::I32(0)]),
+        Err(e) => {
+            error!("track free failed: {}", e);
             Ok(vec![WasmValue::I32(-1)])
         }
     }

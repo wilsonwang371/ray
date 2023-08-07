@@ -27,7 +27,7 @@ use std::sync::{Arc, RwLock};
 use wasmtime::AsContextMut;
 use wasmtime::Caller;
 
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 pub struct WasmtimeContext<'a> {
     pub caller: &'a mut Caller<'a, WasmtimeStoreData>,
@@ -142,7 +142,7 @@ impl WasmContext for WasmtimeContext<'_> {
                 return Err(anyhow!("Failed to get object: {}", e));
             }
         };
-        info!("get_object: {:x?} {:x?}", object_id, object);
+        debug!("get_object: {:x?} {:x?}", object_id, object);
         Ok(object)
     }
 
@@ -183,5 +183,15 @@ impl WasmContext for WasmtimeContext<'_> {
                 .insert(k.clone(), v.clone());
         });
         Ok(())
+    }
+
+    fn track_mem_ops(&mut self, _mem_ptr: u32, _mem_size: usize, _is_free: bool) -> Result<()> {
+        // TODO: implement this
+        Err(anyhow!("Not implemented yet"))
+    }
+
+    fn lookup_mem_alloc(&mut self, _mem_ptr: u32) -> Result<usize> {
+        // TODO: implement this
+        Err(anyhow!("Not implemented yet"))
     }
 }

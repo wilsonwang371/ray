@@ -39,7 +39,7 @@ pub struct WasmtimeEngine {
 }
 
 impl WasmtimeEngine {
-    pub fn new() -> Self {
+    pub fn new(_: Option<&str>, _: Vec<&str>) -> Self {
         let engine = Engine::default();
         WasmtimeEngine {
             engine: engine.clone(),

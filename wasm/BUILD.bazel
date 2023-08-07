@@ -5,6 +5,12 @@ load("//bazel:ray.bzl", "COPTS")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_dylib_library", "rust_library")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 
+# define feature list
+FEATURES = [
+    "enable-ray-hostcalls",
+    "enable-ray-runtime",
+]
+
 cargo_build_script(
     name = "ray_wasm_buildrs",
     srcs = ["build.rs"],
@@ -42,9 +48,10 @@ rust_library(
     ),
     crate_name = "wasm_on_ray",
     crate_root = "src/lib.rs",
-    data = [
-        "wasmedge_pkg",
-    ],
+    crate_features = FEATURES,
+    # data = [
+    #     "wasmedge_pkg",
+    # ],
     proc_macro_deps = [
         "@wasm_crate_index//:wasmedge-macro",
     ],
@@ -73,6 +80,7 @@ rust_library(
         "@wasm_crate_index//:wasmedge-sys",
         "@wasm_crate_index//:wasmedge-types",
         "@wasm_crate_index//:wasmtime",
+        "@wasm_crate_index//:shellwords",
     ],
 )
 
@@ -89,6 +97,7 @@ rust_dylib_library(
             "src/cmd/*.rs",
         ],
     ),
+    crate_features = FEATURES,
     crate_name = "wasm_on_ray",
     crate_root = "src/lib.rs",
     proc_macro_deps = [
@@ -119,6 +128,7 @@ rust_dylib_library(
         "@wasm_crate_index//:wasmedge-sys",
         "@wasm_crate_index//:wasmedge-types",
         "@wasm_crate_index//:wasmtime",
+        "@wasm_crate_index//:shellwords",
     ],
 )
 
@@ -151,6 +161,7 @@ rust_binary(
     ],
     crate_name = "wasm_worker",
     crate_root = "src/cmd/wasm_worker.rs",
+    crate_features = FEATURES,
     visibility = ["//visibility:public"],
     deps = [
         ":ray_wasm_lib",
@@ -175,6 +186,7 @@ rust_binary(
     ],
     crate_name = "faas_worker",
     crate_root = "src/cmd/faas_worker.rs",
+    crate_features = FEATURES,
     visibility = ["//visibility:public"],
     deps = [
         ":ray_wasm_lib",
@@ -191,6 +203,7 @@ rust_binary(
     ],
     crate_name = "warrior",
     crate_root = "src/cmd/warrior.rs",
+    crate_features = FEATURES,
     visibility = ["//visibility:public"],
     deps = [
         #":ray_wasm_lib.dylib",
@@ -215,17 +228,7 @@ genrule(
         "warrior",
         "libray_wasm.so",
         # "ray_wasm_lib.dylib",
-    ] + select({
-        "@bazel_tools//src/conditions:darwin": [
-            "@com_github_wasmedge_darwin_x86_64//:lib",
-        ],
-        "@bazel_tools//src/conditions:windows": [
-            "@com_github_wasmedge_windows_x86_64//:lib",
-        ],
-        "//conditions:default": [
-            "@com_github_wasmedge_manylinux2014_x86_64//:lib",
-        ],
-    }),
+    ],
     outs = ["ray_wasm_pkg.out"],
     cmd = """
         touch $@ &&
@@ -237,64 +240,56 @@ genrule(
         cp -f $(location faas_worker) "$$PY_WASM_DIR/" &&
         cp -f $(location libray_wasm.so) "$$PY_WASM_DIR/lib/" &&
         cp -f $(location warrior) "$$PY_WASM_DIR/" &&
-        """ +
-          # cp -f $(location ray_wasm_lib.dylib) "$$PY_WASM_DIR/lib/" &&
-          select({
-              "@bazel_tools//src/conditions:darwin": """cp -f $(locations @com_github_wasmedge_darwin_x86_64//:lib) "$$PY_WASM_DIR/lib/" &&""",
-              "@bazel_tools//src/conditions:windows": """cp -f $(locations @com_github_wasmedge_windows_x86_64//:lib) "$$PY_WASM_DIR/lib/" &&""",
-              "//conditions:default": """cp -f $(locations @com_github_wasmedge_manylinux2014_x86_64//:lib) "$$PY_WASM_DIR/lib/" &&""",
-          }) +
-          """
         echo "$$WORK_DIR" > $@
     """,
     local = True,
     visibility = ["//visibility:public"],
 )
 
-genrule(
-    name = "wasmedge_pkg",
-    srcs = select({
-        "@bazel_tools//src/conditions:darwin": [
-            "@com_github_wasmedge_darwin_x86_64//:all_files",
-            "@com_github_wasmedge_darwin_x86_64//:wasmedge_bin",
-        ],
-        "@bazel_tools//src/conditions:windows": [
-            "@com_github_wasmedge_windows_x86_64//:all_files",
-            "@com_github_wasmedge_windows_x86_64//:wasmedge_bin",
-        ],
-        "//conditions:default": [
-            "@com_github_wasmedge_manylinux2014_x86_64//:all_files",
-            "@com_github_wasmedge_manylinux2014_x86_64//:wasmedge_bin",
-        ],
-    }),
-    outs = ["wasmedge_pkg.out"],
-    # we should avoid using sudo here.
-    cmd = """
-        touch $@ &&
-        WORK_DIR="$$(pwd)" &&
-        PY_WASM_DIR="$$WORK_DIR/python/ray/wasm" &&
-        mkdir -p "$$PY_WASM_DIR" &&
-        WASMEDGE_DIR="$$PY_WASM_DIR/wasmedge" &&
-        WASMEDGE_TMP_DIR="$$WASMEDGE_DIR-$$RANDOM" &&
-        rm -rf \"$$WASMEDGE_TMP_DIR\" &&
-        mkdir -p \"$$WASMEDGE_TMP_DIR\" &&
-        """ + select({
-        "@bazel_tools//src/conditions:darwin": """WASMEDGE_SRC_BIN="$(location @com_github_wasmedge_darwin_x86_64//:wasmedge_bin)" &&""",
-        "@bazel_tools//src/conditions:windows": """WASMEDGE_SRC_BIN="$(location @com_github_wasmedge_windows_x86_64//:wasmedge_bin)" &&""",
-        "//conditions:default": """WASMEDGE_SRC_BIN="$(location @com_github_wasmedge_manylinux2014_x86_64//:wasmedge_bin)" &&""",
-    }) + """ 
-        WASMEDGE_SRC_BIN_DIR="$$(dirname $$WASMEDGE_SRC_BIN)" &&
-        WASMEDGE_SRC_DIR="$$(dirname \"$$WASMEDGE_SRC_BIN_DIR\")" &&
-        (cp -RLuvf \"$$WASMEDGE_SRC_DIR/.\" \"$$WASMEDGE_TMP_DIR\" || true) &&
-        if [ -d \"$$WASMEDGE_TMP_DIR/lib\" ]; then pushd $$WASMEDGE_TMP_DIR; ln -s \"./lib\" \"./lib64\"; fi &&
-        (mv \"$$WASMEDGE_DIR\" \"$$WASMEDGE_DIR-old-$$RANDOM\" || true) &&
-        (mv \"$$WASMEDGE_TMP_DIR\" \"$$WASMEDGE_DIR\" || true) &&
-        (rm -rf \"$$WASMEDGE_DIR-old-*\" || true) &&
-        echo "$$WASMEDGE_DIR" > $@
-    """,
-    local = True,
-    tags = [
-        "no-cache",
-    ],
-    visibility = ["//visibility:public"],
-)
+# genrule(
+#     name = "wasmedge_pkg",
+#     srcs = select({
+#         "@bazel_tools//src/conditions:darwin": [
+#             "@com_github_wasmedge_darwin_x86_64//:all_files",
+#             "@com_github_wasmedge_darwin_x86_64//:wasmedge_bin",
+#         ],
+#         "@bazel_tools//src/conditions:windows": [
+#             "@com_github_wasmedge_windows_x86_64//:all_files",
+#             "@com_github_wasmedge_windows_x86_64//:wasmedge_bin",
+#         ],
+#         "//conditions:default": [
+#             "@com_github_wasmedge_manylinux2014_x86_64//:all_files",
+#             "@com_github_wasmedge_manylinux2014_x86_64//:wasmedge_bin",
+#         ],
+#     }),
+#     outs = ["wasmedge_pkg.out"],
+#     # we should avoid using sudo here.
+#     cmd = """
+#         touch $@ &&
+#         WORK_DIR="$$(pwd)" &&
+#         PY_WASM_DIR="$$WORK_DIR/python/ray/wasm" &&
+#         mkdir -p "$$PY_WASM_DIR" &&
+#         WASMEDGE_DIR="$$PY_WASM_DIR/wasmedge" &&
+#         WASMEDGE_TMP_DIR="$$WASMEDGE_DIR-$$RANDOM" &&
+#         rm -rf \"$$WASMEDGE_TMP_DIR\" &&
+#         mkdir -p \"$$WASMEDGE_TMP_DIR\" &&
+#         """ + select({
+#         "@bazel_tools//src/conditions:darwin": """WASMEDGE_SRC_BIN="$(location @com_github_wasmedge_darwin_x86_64//:wasmedge_bin)" &&""",
+#         "@bazel_tools//src/conditions:windows": """WASMEDGE_SRC_BIN="$(location @com_github_wasmedge_windows_x86_64//:wasmedge_bin)" &&""",
+#         "//conditions:default": """WASMEDGE_SRC_BIN="$(location @com_github_wasmedge_manylinux2014_x86_64//:wasmedge_bin)" &&""",
+#     }) + """ 
+#         WASMEDGE_SRC_BIN_DIR="$$(dirname $$WASMEDGE_SRC_BIN)" &&
+#         WASMEDGE_SRC_DIR="$$(dirname \"$$WASMEDGE_SRC_BIN_DIR\")" &&
+#         (cp -RLuvf \"$$WASMEDGE_SRC_DIR/.\" \"$$WASMEDGE_TMP_DIR\" || true) &&
+#         if [ -d \"$$WASMEDGE_TMP_DIR/lib\" ]; then pushd $$WASMEDGE_TMP_DIR; ln -s \"./lib\" \"./lib64\"; fi &&
+#         (mv \"$$WASMEDGE_DIR\" \"$$WASMEDGE_DIR-old-$$RANDOM\" || true) &&
+#         (mv \"$$WASMEDGE_TMP_DIR\" \"$$WASMEDGE_DIR\" || true) &&
+#         (rm -rf \"$$WASMEDGE_DIR-old-*\" || true) &&
+#         echo "$$WASMEDGE_DIR" > $@
+#     """,
+#     local = True,
+#     tags = [
+#         "no-cache",
+#     ],
+#     visibility = ["//visibility:public"],
+# )

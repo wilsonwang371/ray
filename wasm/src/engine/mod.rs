@@ -26,7 +26,7 @@ use anyhow::{anyhow, Result};
 use core::result::Result::Ok;
 use lazy_static::lazy_static;
 use rmp::decode::{read_bin_len, read_f32, read_f64, read_i32, read_i64, read_marker};
-use rmp::encode::{write_bin, write_f32, write_f64, write_i32, write_i64};
+use rmp::encode::{write_bin, write_f32, write_f64, write_i32, write_i64, write_nil};
 use rmp::Marker;
 
 use crate::util::RayLog;
@@ -100,10 +100,14 @@ pub enum WasmEngineType {
 pub struct WasmEngineFactory {}
 
 impl WasmEngineFactory {
-    pub fn create_engine(engine_type: WasmEngineType) -> Result<Box<dyn WasmEngine + Send + Sync>> {
+    pub fn create_engine(
+        engine_type: WasmEngineType,
+        cmdline: Option<&str>,
+        dirs: Vec<&str>,
+    ) -> Result<Box<dyn WasmEngine + Send + Sync>> {
         let engine: Box<dyn WasmEngine + Send + Sync> = match engine_type {
-            WasmEngineType::WASMTIME => Box::new(WasmtimeEngine::new()),
-            WasmEngineType::WASMEDGE => Box::new(WasmEdgeEngine::new()),
+            WasmEngineType::WASMTIME => Box::new(WasmtimeEngine::new(cmdline, dirs)),
+            WasmEngineType::WASMEDGE => Box::new(WasmEdgeEngine::new(cmdline, dirs)),
             _ => {
                 return Err(anyhow!("unsupported wasm engine type"));
             }
@@ -135,6 +139,13 @@ pub enum WasmValue {
 }
 
 impl WasmValue {
+    // write nil to buffer
+    pub fn msgpack_nil_vec() -> Vec<u8> {
+        let mut buf = Vec::new();
+        write_nil(&mut buf).unwrap();
+        buf
+    }
+
     pub fn as_msgpack_vec(&self) -> Result<Vec<u8>> {
         match self {
             WasmValue::I32(v) => {
@@ -508,4 +519,8 @@ pub trait WasmContext {
     fn get_object(&mut self, object_id: &ObjectID) -> Result<Vec<u8>>;
     fn put_object(&mut self, data: &[u8]) -> Result<ObjectID>;
     fn submit_sandbox_binary(&mut self) -> Result<()>;
+
+    // functions to track mem allocation & free
+    fn track_mem_ops(&mut self, mem_ptr: u32, mem_size: usize, is_free: bool) -> Result<()>;
+    fn lookup_mem_alloc(&mut self, mem_ptr: u32) -> Result<usize>;
 }

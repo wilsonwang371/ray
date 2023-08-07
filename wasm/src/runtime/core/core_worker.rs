@@ -126,6 +126,39 @@ extern "C" {
         actor_id_len: *mut usize,
     ) -> i32;
 
+    // actor creation options related functions
+    pub fn ActorCreationOptions_Create() -> *mut c_void;
+    pub fn ActorCreationOptions_Destroy(actor_creation_options: *mut c_void);
+    pub fn ActorCreationOptions_SetMaxRestarts(
+        actor_creation_options: *mut c_void,
+        max_restarts: i64,
+    ) -> i32;
+    pub fn ActorCreationOptions_SetMaxTaskRetries(
+        actor_creation_options: *mut c_void,
+        max_task_retries: i64,
+    ) -> i32;
+    pub fn ActorCreationOptions_SetMaxConcurrency(
+        actor_creation_options: *mut c_void,
+        max_concurrency: i64,
+    ) -> i32;
+    pub fn ActorCreationOptions_SetRayNamespace(
+        actor_creation_options: *mut c_void,
+        ray_namespace: *const u8,
+        ray_namespace_len: usize,
+    ) -> i32;
+    pub fn ActorCreationOptions_SetName(
+        actor_creation_options: *mut c_void,
+        name: *const u8,
+        name_len: usize,
+    ) -> i32;
+
+    // actor related functions
+    pub fn CoreWorker_CreateActor(
+        ray_function: *mut c_void,
+        task_args: *mut c_void,
+        actor_creation_options: *mut c_void,
+    ) -> i32;
+
     // task options related functions
     pub fn TaskOptions_Create() -> *mut c_void;
     pub fn TaskOptions_Destroy(task_options: *mut c_void);

@@ -18,6 +18,7 @@ use crate::engine::{
 };
 use crate::runtime::{common_proto::TaskType, CallOptions, InvocationSpec, RayRuntime};
 use crate::util::RayLog;
+use std::ops::Range;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
@@ -25,6 +26,7 @@ use anyhow::{anyhow, Result};
 use lazy_static::lazy_static;
 
 use sha256::digest;
+use shellwords::split;
 
 use std::collections::HashMap;
 use std::result::Result::Ok;
@@ -33,16 +35,22 @@ use std::sync::{Arc, Mutex, RwLock};
 use tracing::{debug, error, info};
 
 use wasmedge_macro::sys_host_function;
+use wasmedge_sys::plugin::PluginManager;
 use wasmedge_sys::{
-    AsImport, CallingFrame, Config, Executor, FuncType, Function, ImportModule, ImportObject,
-    Instance, Loader, Module, Store, Validator, WasiModule, WasmValue as WasmEdgeWasmValue,
+    AsImport, CallingFrame, Config, Executor, FuncType, Function, ImportModule, Instance, Loader,
+    Module, Store, Validator, WasiInstance, WasiModule, WasmValue as WasmEdgeWasmValue,
 };
 use wasmedge_types::{error::HostFuncError, ValType};
 
 mod data;
 use data::*;
 
+use libc::c_void;
+
 use crate::runtime as rt;
+
+const MAX_ALLOC_TRACKING: usize = 1024 * 1024;
+
 // macro_rules! to convert wasmedge call to our call
 macro_rules! hostcall_wrapper {
     ($func_name:ident) => {
@@ -82,8 +90,11 @@ macro_rules! hostcall_wrapper {
     };
 }
 
-type WasmEdgeHostCallType =
-    fn(CallingFrame, Vec<WasmEdgeWasmValue>) -> Result<Vec<WasmEdgeWasmValue>, HostFuncError>;
+type WasmEdgeHostCallType = fn(
+    CallingFrame,
+    Vec<WasmEdgeWasmValue>,
+    *mut c_void,
+) -> Result<Vec<WasmEdgeWasmValue>, HostFuncError>;
 
 hostcall_wrapper!(hc_ray_log_write);
 hostcall_wrapper!(hc_ray_memregion_validate);
@@ -93,12 +104,16 @@ hostcall_wrapper!(hc_ray_shutdown);
 hostcall_wrapper!(hc_ray_get);
 hostcall_wrapper!(hc_ray_put);
 hostcall_wrapper!(hc_ray_call);
+// track memory allocation and free
+hostcall_wrapper!(hc_ray_track_malloc);
+hostcall_wrapper!(hc_ray_track_free);
 
 #[allow(dead_code)]
 struct CurrentTaskInfo {
     sandbox_name: String,
     module_hash: String,
     runtime: Option<Arc<RwLock<Box<dyn RayRuntime + Send + Sync>>>>,
+    allocs: Vec<Range<u32>>,
     bytes: Vec<u8>,
 }
 
@@ -113,6 +128,8 @@ lazy_static! {
         m.insert("get", hc_ray_get);
         m.insert("put", hc_ray_put);
         m.insert("call", hc_ray_call);
+        m.insert("track_malloc", hc_ray_track_malloc);
+        m.insert("track_free", hc_ray_track_free);
         m
     };
 
@@ -121,6 +138,7 @@ lazy_static! {
         sandbox_name: "".to_string(),
         module_hash: "".to_string(),
         runtime: None,
+        allocs: vec![],
         bytes: vec![],
     }));
 
@@ -129,14 +147,17 @@ lazy_static! {
 
 pub struct WasmEdgeEngine {
     cfg: Config,
+    args: Option<Vec<String>>,
     sandboxes: HashMap<String, WasmEdgeSandbox>,
     modules: HashMap<String, WasmEdgeModule>,
-    imports: HashMap<String, ImportObject>,
+    imports: HashMap<String, ImportModule<WasmEdgeHostcallData>>,
+    wasi: WasiInstance,
+    plugins: HashMap<String, Instance>,
     hostcalls_map: HashMap<String, Hostcalls>,
 }
 
 impl WasmEdgeEngine {
-    pub fn new() -> Self {
+    pub fn new(cmdline: Option<&str>, dirs: Vec<&str>) -> Self {
         let cfg = match Config::create() {
             Ok(mut cfg) => {
                 cfg.wasi(true);
@@ -148,14 +169,55 @@ impl WasmEdgeEngine {
             }
         };
 
+        let mut parsed_args = match cmdline {
+            Some(cmdline) => {
+                // parse cmdline
+                match split(cmdline) {
+                    Ok(args) => {
+                        // add a first argument as the program name
+                        let mut new_args = vec!["_".to_string()];
+                        new_args.extend(args);
+                        Some(new_args)
+                    }
+                    Err(e) => {
+                        error!("Failed to split cmdline: {:?}", e);
+                        None
+                    }
+                }
+            }
+            None => None,
+        };
+
         match WasiModule::create(None, None, None) {
             Ok(mut wasi) => {
-                wasi.init_wasi(None, None, None);
+                let mut args = match parsed_args.as_mut() {
+                    Some(args) => {
+                        // convert string vec to str vec
+                        let mut new_args = vec![];
+                        for arg in args.iter() {
+                            new_args.push(arg.as_str());
+                        }
+                        Some(new_args)
+                    }
+                    None => None,
+                };
+
+                let mut preopens = match dirs.len() {
+                    0 => None,
+                    _ => Some(dirs),
+                };
+
+                debug!("preopen dirs: {:?}", preopens);
+
+                wasi.init_wasi(args, None, preopens);
                 let engine = WasmEdgeEngine {
                     cfg,
+                    args: parsed_args,
                     sandboxes: HashMap::new(),
                     modules: HashMap::new(),
-                    imports: HashMap::from([(wasi.name().to_string(), ImportObject::Wasi(wasi))]),
+                    imports: HashMap::new(),
+                    wasi: WasiInstance::Wasi(wasi),
+                    plugins: HashMap::new(),
                     hostcalls_map: HashMap::new(),
                 };
                 engine
@@ -206,15 +268,16 @@ impl WasmEngine for WasmEdgeEngine {
             if self.imports.contains_key(name) {
                 continue;
             }
-            info!("creating import module {} from hostcalls", name);
+            debug!("creating import module {} from hostcalls", name);
 
             let hc_module_name = hostcalls.module_name.clone();
-            let mut import_module = ImportModule::create(hc_module_name.as_str())?;
+            let mut import_module = ImportModule::create(hc_module_name.as_str(), None)?;
 
             // This is a hack to set the current runtime
             let tmp = Arc::clone(&hostcalls.runtime);
             let mut current_task = CURRENT_TASK.write().unwrap();
             current_task.runtime = Some(tmp);
+            current_task.allocs = vec![];
 
             for hostcall in hostcalls.functions.iter() {
                 let params = &hostcall.params;
@@ -236,37 +299,83 @@ impl WasmEngine for WasmEdgeEngine {
                 }
                 let supported_call = HOSTCALLS[hostcall.name.as_str()];
 
-                let func = unsafe {
-                    Function::create_with_data(
-                        &func_ty,
-                        Box::new(supported_call),
-                        std::ptr::null_mut(), // TODO: move this part to instance init so that we have access to sandbox?
-                        0,
-                    )
-                }?;
+                let func = match Function::create_sync_func::<WasmEdgeHostcallData>(
+                    &func_ty,
+                    Box::new(supported_call),
+                    None,
+                    0,
+                ) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        return Err(anyhow!("Failed to create function: {:?}", e));
+                    }
+                };
                 import_module.add_func(hostcall.name.as_str(), func);
             }
-            self.imports.insert(
-                hostcalls.module_name.clone(),
-                ImportObject::Import(import_module),
-            );
+            self.imports
+                .insert(hostcalls.module_name.clone(), import_module);
         }
 
         // register all import objects
-        for (import_module_name, import_obj) in self.imports.iter() {
-            let import_obj = import_obj.clone();
+        for (import_module_name, import_mod) in self.imports.iter() {
+            let import_mod = import_mod.clone();
             match sandbox
                 .executor
-                .register_import_object(&mut sandbox.store, &import_obj)
+                .register_import_module(&mut sandbox.store, &import_mod)
             {
                 Ok(_) => {
-                    info!("Registered import module: {}", import_module_name);
+                    RayLog::info(
+                        format!("Registered import module: {}", import_module_name).as_str(),
+                    );
                 }
                 Err(e) => {
                     return Err(anyhow!("Failed to register import module: {:?}", e));
                 }
             }
         }
+
+        // register wasi instance
+        match sandbox
+            .executor
+            .register_wasi_instance(&mut sandbox.store, &self.wasi)
+        {
+            Ok(_) => {
+                RayLog::info("Registered wasi instance");
+            }
+            Err(e) => {
+                return Err(anyhow!("Failed to register wasi instance: {:?}", e));
+            }
+        }
+
+        // load wasi-nn
+        PluginManager::load_plugins_from_default_paths();
+
+        let mut i = match PluginManager::find("wasi_nn") {
+            Some(p) => p.mod_instance("wasi_nn").unwrap(),
+            None => {
+                error!("Failed to find wasi_nn plugin");
+                panic!();
+            }
+        };
+        self.plugins.insert("wasi_nn".to_string(), i.clone());
+
+        sandbox
+            .executor
+            .register_plugin_instance(&mut sandbox.store, &mut i)
+            .unwrap();
+        // sandbox.store.module_names().unwrap().iter().for_each(|x| {
+        //     info!("Module: {:?}", x);
+        //     sandbox
+        //         .store
+        //         .module(x)
+        //         .unwrap()
+        //         .func_names()
+        //         .unwrap()
+        //         .iter()
+        //         .for_each(|y| {
+        //             info!("   Function: {:?}", y);
+        //         });
+        // });
 
         let module = &self.modules[module_name];
         match CURRENT_TASK.write() {
@@ -287,13 +396,15 @@ impl WasmEngine for WasmEdgeEngine {
             .register_active_module(&mut sandbox.store, module)
         {
             Ok(instance) => {
-                let wi = WasmEdgeInstance::new(instance);
+                let wi = WasmEdgeInstance::new(Some(instance));
                 self.sandboxes
                     .get_mut(sandbox_name)
                     .unwrap()
                     .instances
                     .insert(instance_name.to_string(), wi);
-                info!("Registered instance: {}", instance_name);
+                RayLog::info(
+                    format!("Registered instance: {} {}", sandbox_name, instance_name).as_str(),
+                );
                 Ok(Box::new(
                     &self.sandboxes[sandbox_name].instances[instance_name],
                 ))
@@ -327,7 +438,8 @@ impl WasmEngine for WasmEdgeEngine {
                 (v, None) => Ok(v),
                 (_, Some(data)) => {
                     // save data to sandbox and use the pointer as argument
-                    match instance.instance.get_func("__war_malloc") {
+                    let inner_instance = instance.inner.as_ref().unwrap();
+                    match inner_instance.get_func("__war_malloc") {
                         Ok(func) => {
                             match sandbox.executor.call_func(
                                 &func,
@@ -338,31 +450,33 @@ impl WasmEngine for WasmEdgeEngine {
                                         0 => {
                                             return Err(anyhow!("Failed to allocate memory"));
                                         }
-                                        ptr => match instance.instance.get_memory("memory") {
-                                            Ok(mut mem) => {
-                                                // add the new allocated memory into the list
-                                                // so that we can free it later
-                                                allocated_mem_list.push(ptr);
+                                        ptr => {
+                                            match inner_instance.get_memory("memory") {
+                                                Ok(mut mem) => {
+                                                    // add the new allocated memory into the list
+                                                    // so that we can free it later
+                                                    allocated_mem_list.push(ptr);
 
-                                                // copy data to wasm memory so that wasm function
-                                                // can access it
-                                                match mem.set_data(data.as_ref(), ptr as u32) {
-                                                    Ok(_) => {
-                                                        return Ok(WasmEdgeWasmValue::from_i32(
-                                                            ptr,
-                                                        ));
-                                                    }
-                                                    Err(_) => {
-                                                        return Err(anyhow!(
-                                                            "Failed to set memory"
-                                                        ));
+                                                    // copy data to wasm memory so that wasm function
+                                                    // can access it
+                                                    match mem.set_data(data.as_ref(), ptr as u32) {
+                                                        Ok(_) => {
+                                                            return Ok(
+                                                                WasmEdgeWasmValue::from_i32(ptr),
+                                                            );
+                                                        }
+                                                        Err(_) => {
+                                                            return Err(anyhow!(
+                                                                "Failed to set memory"
+                                                            ));
+                                                        }
                                                     }
                                                 }
+                                                Err(_) => {
+                                                    return Err(anyhow!("Failed to get memory"));
+                                                }
                                             }
-                                            Err(_) => {
-                                                return Err(anyhow!("Failed to get memory"));
-                                            }
-                                        },
+                                        }
                                     },
                                     _ => {
                                         return Err(anyhow!("Invalid return value"));
@@ -389,7 +503,12 @@ impl WasmEngine for WasmEdgeEngine {
         };
 
         let res = match func_name.parse::<u32>() {
-            Ok(idx) => match instance.instance.get_table("__indirect_function_table") {
+            Ok(idx) => match instance
+                .inner
+                .as_ref()
+                .unwrap()
+                .get_table("__indirect_function_table")
+            {
                 Ok(table) => match table.get_data(idx) {
                     Ok(val) => match val.func_ref() {
                         Some(func) => match sandbox.executor.call_func_ref(&func, args) {
@@ -414,13 +533,18 @@ impl WasmEngine for WasmEdgeEngine {
             },
             Err(_) => {
                 let func = instance
-                    .instance
+                    .inner
+                    .as_ref()
+                    .unwrap()
                     .get_func(func_name)
                     .expect("Failed to get function");
+                RayLog::info(format!("Executing function \"{}\"", func_name).as_str());
                 match sandbox.executor.call_func(&func, args) {
                     Ok(rtn) => match rtn.len() {
                         0 => {
-                            debug!("Completed executing function \"{}\"", func_name);
+                            RayLog::info(
+                                format!("Finished executing function \"{}\"", func_name).as_str(),
+                            );
                             Ok(vec![])
                         }
                         1 => {
@@ -428,7 +552,9 @@ impl WasmEngine for WasmEdgeEngine {
                             if val != 0 {
                                 return Err(anyhow!("Failed to run function"));
                             }
-                            debug!("Completed executing function \"{}\"", func_name);
+                            RayLog::info(
+                                format!("Finished executing function \"{}\"", func_name).as_str(),
+                            );
                             Ok(vec![WasmValue::I32(val)])
                         }
                         _ => {
@@ -446,7 +572,7 @@ impl WasmEngine for WasmEdgeEngine {
 
         // free allocated memory
         for ptr in allocated_mem_list.iter() {
-            match instance.instance.get_func("__war_free") {
+            match instance.inner.as_ref().unwrap().get_func("__war_free") {
                 Ok(func) => {
                     match sandbox
                         .executor
@@ -512,7 +638,7 @@ impl WasmEngine for WasmEdgeEngine {
         &mut self,
         rt: &Arc<RwLock<Box<dyn RayRuntime + Send + Sync>>>,
     ) -> Result<()> {
-        let mut result_buf: Vec<u8> = vec![];
+        let mut result_buf: Option<Vec<u8>> = None;
 
         // receive task from channel with a timeout
         match TASK_RECEIVER.lock().ok().unwrap().as_ref() {
@@ -574,12 +700,13 @@ impl WasmEngine for WasmEdgeEngine {
                                     .as_str(),
                             );
 
-                            if results.len() != 1 {
-                                RayLog::error("task_loop_once: invalid length of result");
-                            } else {
+                            if results.len() == 0 {
+                                // if no value is returned, we return a space
+                                result_buf = Some(WasmValue::msgpack_nil_vec());
+                            } else if results.len() == 1 {
                                 match results[0].as_msgpack_vec() {
                                     Ok(v) => {
-                                        result_buf = v;
+                                        result_buf = Some(v);
                                     }
                                     Err(e) => {
                                         RayLog::error(
@@ -588,6 +715,8 @@ impl WasmEngine for WasmEdgeEngine {
                                         );
                                     }
                                 }
+                            } else {
+                                RayLog::error("task_loop_once: invalid length of result");
                             }
                         }
                         Err(e) => {
@@ -609,20 +738,17 @@ impl WasmEngine for WasmEdgeEngine {
 
         // we got result here
         match TASK_RESULT_SENDER.lock().ok().unwrap().as_ref() {
-            Some(tx) => {
-                if result_buf.len() != 0 {
+            Some(tx) => match result_buf {
+                Some(buf) => {
                     RayLog::info(
-                        format!(
-                            "task_loop_once: sending wasm task result: {:#x?}",
-                            result_buf
-                        )
-                        .as_str(),
+                        format!("task_loop_once: sending wasm task result: {:#x?}", buf).as_str(),
                     );
-                    tx.send(Ok(result_buf)).unwrap();
-                } else {
+                    tx.send(Ok(buf)).unwrap();
+                }
+                None => {
                     tx.send(Err(anyhow!("Invalid result"))).unwrap();
                 }
-            }
+            },
             None => {
                 RayLog::error("task_loop_once: channel not initialized");
                 return Err(anyhow!("task_loop_once: channel not initialized"));
@@ -675,7 +801,7 @@ struct WasmEdgeSandbox {
 impl WasmEdgeSandbox {
     pub fn new(cfg: Config, name: &str) -> Self {
         match Store::create() {
-            Ok(store) => WasmEdgeSandbox {
+            Ok(mut store) => WasmEdgeSandbox {
                 name: name.to_string(),
                 store,
                 executor: Executor::create(Some(&cfg), None).unwrap(),
@@ -695,18 +821,27 @@ impl WasmSandbox for WasmEdgeSandbox {
 
 #[derive(Clone)]
 struct WasmEdgeInstance {
-    instance: Instance,
+    inner: Option<Instance>,
+    malloc_list: Arc<RwLock<HashMap<u32, u32>>>,
 }
 
 impl WasmEdgeInstance {
-    pub fn new(instance: Instance) -> Self {
-        WasmEdgeInstance { instance }
+    pub fn new(instance: Option<Instance>) -> Self {
+        WasmEdgeInstance {
+            inner: instance,
+            malloc_list: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 }
 
 impl WasmInstance for WasmEdgeInstance {
     // TODO: implement WasmInstance
 }
+
+#[derive(Clone)]
+struct WasmEdgeHostcallData {}
+
+impl WasmEdgeHostcallData {}
 
 struct WasmEdgeContext {
     frame: CallingFrame,
@@ -801,7 +936,7 @@ impl WasmContext for WasmEdgeContext {
                 let rt = rt.write().unwrap();
                 match rt.get(object_id) {
                     Ok(object) => {
-                        info!("get_object: {:x?} {:x?}", object_id, object);
+                        debug!("get_object: {:x?} {:x?}", object_id, object);
                         Ok(object)
                     }
                     Err(_) => Err(anyhow!("Failed to get object")),
@@ -855,6 +990,99 @@ impl WasmContext for WasmEdgeContext {
                 }
             }
             None => Err(anyhow!("No runtime")),
+        }
+    }
+
+    fn track_mem_ops(&mut self, mem_ptr: u32, mem_size: usize, is_free: bool) -> Result<()> {
+        match CURRENT_TASK.write() {
+            Ok(mut current_task) => {
+                if is_free {
+                    if current_task.allocs.len() == 0 {
+                        return Err(anyhow!("Memory not allocated"));
+                    }
+                    // remove from allocs, searching using binary search.
+                    // return error if entry not found
+                    let mut left = 0 as i32;
+                    let mut right = (current_task.allocs.len() - 1) as i32;
+                    while left <= right {
+                        let mid = (left + right) / 2;
+                        let alloc = &current_task.allocs[mid as usize];
+                        if alloc.start == mem_ptr {
+                            current_task.allocs.remove(mid as usize);
+                            return Ok(());
+                        } else if alloc.start > mem_ptr {
+                            right = mid - 1;
+                        } else {
+                            left = mid + 1;
+                        }
+                    }
+                    return Err(anyhow!("Memory not allocated"));
+                } else {
+                    if current_task.allocs.len() == 0 {
+                        current_task.allocs.push(Range {
+                            start: mem_ptr,
+                            end: mem_ptr + mem_size as u32,
+                        });
+                        return Ok(());
+                    }
+                    // add to allocs to sorted list, searching using binary search.
+                    // error if exists
+                    let mut left = 0 as i32;
+                    let mut right = (current_task.allocs.len() - 1) as i32;
+                    while left <= right {
+                        let mid = (left + right) / 2;
+                        let alloc = &current_task.allocs[mid as usize];
+                        if alloc.start == mem_ptr {
+                            return Err(anyhow!("Memory already allocated"));
+                        } else if alloc.start > mem_ptr {
+                            right = mid - 1;
+                        } else {
+                            left = mid + 1;
+                        }
+                    }
+                    current_task.allocs.insert(
+                        left as usize,
+                        Range {
+                            start: mem_ptr,
+                            end: mem_ptr + mem_size as u32,
+                        },
+                    );
+                    return Ok(());
+                }
+            }
+            Err(e) => {
+                error!("Failed to write current task: {:?}", e);
+                panic!();
+            }
+        };
+    }
+
+    fn lookup_mem_alloc(&mut self, mem_ptr: u32) -> Result<usize> {
+        match CURRENT_TASK.read() {
+            Ok(current_task) => {
+                if current_task.allocs.len() == 0 {
+                    return Err(anyhow!("Memory not allocated"));
+                }
+                // find the alloc that contains mem_ptr using binary search
+                let mut left = 0 as i32;
+                let mut right = (current_task.allocs.len() - 1) as i32;
+                while left <= right {
+                    let mid = (left + right) / 2;
+                    let alloc = &current_task.allocs[mid as usize];
+                    if alloc.start <= mem_ptr && mem_ptr < alloc.end {
+                        return Ok((alloc.end - alloc.start) as usize);
+                    } else if alloc.start > mem_ptr {
+                        right = mid - 1;
+                    } else {
+                        left = mid + 1;
+                    }
+                }
+                Err(anyhow!("Failed to find alloc"))
+            }
+            Err(e) => {
+                error!("Failed to read current task: {:?}", e);
+                panic!();
+            }
         }
     }
 }

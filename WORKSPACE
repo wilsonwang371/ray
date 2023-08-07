@@ -90,17 +90,17 @@ rust_proto_transitive_repositories()
 
 crates_repository(
     name = "wasm_crate_index",
-    annotations = {
-        "wasmedge-sys": [crate.annotation(
-            build_script_data = [
-                "@//wasm:wasmedge_pkg",
-            ],
-            build_script_env = {
-                "WASMEDGE_INCLUDE_DIR": "$${pwd}/../../../../../execroot/com_github_ray_project_ray/python/ray/wasm/wasmedge/include",
-                "WASMEDGE_LIB_DIR": "$${pwd}/../../../../../execroot/com_github_ray_project_ray/python/ray/wasm/wasmedge/lib64",
-            },
-        )],
-    },
+    # annotations = {
+    #     "wasmedge-sys": [crate.annotation(
+    #         build_script_data = [
+    #             "@//wasm:wasmedge_pkg",
+    #         ],
+    #         # build_script_env = {
+    #         #     "WASMEDGE_INCLUDE_DIR": "$${pwd}/../../../../../execroot/com_github_ray_project_ray/python/ray/wasm/wasmedge/include",
+    #         #     "WASMEDGE_LIB_DIR": "$${pwd}/../../../../../execroot/com_github_ray_project_ray/python/ray/wasm/wasmedge/lib64",
+    #         # },
+    #     )],
+    # },
     cargo_lockfile = "//wasm:Cargo.lock",
     lockfile = "//wasm:Cargo.Bazel.lock",
     manifests = ["//wasm:Cargo.toml"],

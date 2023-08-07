@@ -755,6 +755,103 @@ int CoreWorker_GetActor(const char *actor_name,
   return 0;
 }
 
+int CoreWorker_CreateActor(void *ray_function,
+                           void *task_args_vec,
+                           void *actor_creation_options) {
+  if (ray_function == nullptr || task_args_vec == nullptr ||
+      actor_creation_options == nullptr) {
+    return -1;
+  }
+  auto &core_worker = CoreWorkerProcess::GetCoreWorker();
+  ActorID actor_id;
+  auto status =
+      core_worker.CreateActor(*(RayFunction *)ray_function,
+                              *(std::vector<std::unique_ptr<TaskArg>> *)task_args_vec,
+                              *(ActorCreationOptions *)actor_creation_options,
+                              "",
+                              &actor_id);
+  if (!status.ok()) {
+    return -1;
+  }
+  return 0;
+}
+
+// ---------------------- ActorCreationOptions ----------------------
+
+void *ActorCreationOptions_Create() {
+  std::string empty_string = "";
+  std::unordered_map<std::string, double> resources;
+  rpc::SchedulingStrategy scheduling_strategy;
+  scheduling_strategy.mutable_default_scheduling_strategy();
+  return new ActorCreationOptions(
+      /*max_restarts=*/0,
+      /*max_task_retries=*/0,
+      /*max_concurrency=*/1,
+      /*resources=*/resources,
+      resources,
+      {},
+      false,
+      empty_string,
+      /*ray_namespace=*/empty_string,
+      false,
+      scheduling_strategy);
+}
+
+void ActorCreationOptions_Destroy(void *actor_creation_options) {
+  if (actor_creation_options == nullptr) {
+    return;
+  }
+  delete (ActorCreationOptions *)actor_creation_options;
+}
+
+int ActorCreationOptions_SetMaxRestarts(void *actor_creation_options,
+                                        int64_t max_restarts) {
+  if (actor_creation_options == nullptr) {
+    return -1;
+  }
+  ((ActorCreationOptions *)actor_creation_options)->max_restarts = max_restarts;
+  return 0;
+}
+
+int ActorCreationOptions_SetMaxTaskRetries(void *actor_creation_options,
+                                           int64_t max_task_retries) {
+  if (actor_creation_options == nullptr) {
+    return -1;
+  }
+  ((ActorCreationOptions *)actor_creation_options)->max_task_retries = max_task_retries;
+  return 0;
+}
+
+int ActorCreationOptions_SetMaxConcurrency(void *actor_creation_options,
+                                           int64_t max_concurrency) {
+  if (actor_creation_options == nullptr) {
+    return -1;
+  }
+  ((ActorCreationOptions *)actor_creation_options)->max_concurrency = max_concurrency;
+  return 0;
+}
+
+int ActorCreationOptions_SetRayNamespace(void *actor_creation_options,
+                                         const char *namespace_,
+                                         size_t namespace_len) {
+  if (actor_creation_options == nullptr || namespace_ == nullptr || namespace_len == 0) {
+    return -1;
+  }
+  ((ActorCreationOptions *)actor_creation_options)->ray_namespace =
+      std::string(namespace_, namespace_len);
+  return 0;
+}
+
+int ActorCreationOptions_SetName(void *actor_creation_options,
+                                 const char *name,
+                                 size_t name_len) {
+  if (actor_creation_options == nullptr || name == nullptr || name_len == 0) {
+    return -1;
+  }
+  ((ActorCreationOptions *)actor_creation_options)->name = std::string(name, name_len);
+  return 0;
+}
+
 // ---------------------- TaskOptions ----------------------
 
 void *TaskOptions_Create() { return new TaskOptions(); }

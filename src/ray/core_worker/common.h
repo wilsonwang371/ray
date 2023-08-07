@@ -129,31 +129,31 @@ struct ActorCreationOptions {
   /// Maximum number of times that the actor should be restarted if it dies
   /// unexpectedly. A value of -1 indicates infinite restarts. If it's 0, the
   /// actor won't be restarted.
-  const int64_t max_restarts = 0;
+  int64_t max_restarts = 0;
   /// Maximum number of times that individual tasks can be retried at the
   /// actor, if the actor dies unexpectedly. If -1, then the task may be
   /// retried infinitely many times.
-  const int64_t max_task_retries = 0;
+  int64_t max_task_retries = 0;
   /// The max number of concurrent tasks to run on this direct call actor.
-  const int max_concurrency = 1;
+  int max_concurrency = 1;
   /// Resources required by the whole lifetime of this actor.
-  const std::unordered_map<std::string, double> resources;
+  std::unordered_map<std::string, double> resources;
   /// Resources required to place this actor.
-  const std::unordered_map<std::string, double> placement_resources;
+  std::unordered_map<std::string, double> placement_resources;
   /// The dynamic options used in the worker command when starting a worker process for
   /// an actor creation task.
-  const std::vector<std::string> dynamic_worker_options;
+  std::vector<std::string> dynamic_worker_options;
   /// Whether to keep the actor persistent after driver exit. If true, this will set
   /// the worker to not be destroyed after the driver shutdown.
   std::optional<bool> is_detached;
   /// The name to give this detached actor that can be used to get a handle to it from
   /// other drivers. This must be globally unique across the cluster.
   /// This should set if and only if is_detached is true.
-  const std::string name;
+  std::string name;
   /// The namespace to give this detached actor so that the actor is only visible
   /// with the namespace.
   /// This should set if and only if is_detached is true.
-  const std::string ray_namespace;
+  std::string ray_namespace;
   /// Whether to use async mode of direct actor call.
   const bool is_asyncio = false;
   /// Runtime Env Info used by this task. It includes Runtime Env and some

@@ -29,6 +29,7 @@ type StartupToken = i64;
 pub enum RunMode {
     SingleProcess,
     Cluster,
+    Dummy,
 }
 
 #[derive(Clone, Debug)]

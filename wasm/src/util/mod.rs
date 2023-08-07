@@ -210,6 +210,29 @@ pub struct LauncherParameters {
     /// if not set, the default value is `_start`
     #[arg(short = 's', long, verbatim_doc_comment, default_value = "_start")]
     pub entry_point: String,
+
+    /// command line arguments for the entry point function
+    /// if not set, the default value is empty string
+    /// the arguments are separated by space
+    /// e.g. "arg1 arg2 arg3"
+    /// if the argument contains space, it should be quoted
+    /// e.g. "arg1 arg2 \"arg 3\""
+    #[arg(
+        short = 'a',
+        long,
+        value_name = "ARG1 ARG2 ...",
+        verbatim_doc_comment,
+        default_value = ""
+    )]
+    pub args: Option<String>,
+
+    /// binding directories into wasm virtual file system
+    /// this argument can be used multiple times
+    /// the directories are in the format of "guest_dir:host_dir" or
+    /// "host_dir"
+    /// e.g. "/tmp:/tmp" or "/tmp"
+    #[arg(short = 'd', long = "dir", value_name = "GUEST_DIR:HOST_DIR", verbatim_doc_comment, default_value = None)]
+    pub dirs: Option<Vec<String>>,
 }
 
 pub enum SerDesType {
@@ -260,7 +283,7 @@ impl MsgPackSerDes {
             Ok(m) => match m {
                 Marker::FixPos(_) => unimplemented!(),
                 Marker::FixNeg(_) => unimplemented!(),
-                Marker::Null => unimplemented!(),
+                Marker::Null => Ok(vec![]),
                 Marker::True => unimplemented!(),
                 Marker::False => unimplemented!(),
                 Marker::U8 => unimplemented!(),

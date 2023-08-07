@@ -5,6 +5,9 @@ set -e
 WASI_VERSION=14
 WASI_VERSION_FULL=${WASI_VERSION}.0
 
+# get current dir
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 # find out the operating system: darwin, linux, etc.
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 if [ "${OS}" = "darwin" ]; then
@@ -46,19 +49,23 @@ fi
 
 export CC="${WASI_SDK_PATH}/bin/clang --sysroot=${WASI_SDK_PATH}/share/wasi-sysroot"
 
-$CC --target=wasm32-unknown-wasi \
-    -Wno-format-security \
-    -Wl,--export-all \
-    -I. \
-    ./simple.c -o simple.wasm # -nostdlib
+# iterate through all c files in the current directory recursively
+for file in $(find ${DIR} -name "*.c" | grep -v "wasi-sdk" ); do
+    echo "Compiling ${file}..."
+    $CC --target=wasm32-unknown-wasi \
+        -Wno-format-security \
+        -Wl,--export-all \
+        -I${DIR}/../include \
+        -I${file%/*}/ \
+        ${file} -o ${file%.c}.wasm # -nostdlib
 
-# check if wabt is installed
-if ! [ -x "$(command -v wasm2wat)" ]; then
-    # warn if not installed
-    echo "Warning: wabt is not installed. Please install wabt to generate wat files." >&2
-    exit 0
-else
-    # if installed, generate wat files
-    wasm2wat simple.wasm -o simple.wat
-    wasm-objdump -dhs simple.wasm >simple.objdump
-fi
+    # check if wabt is installed
+    if ! [ -x "$(command -v wasm2wat)" ]; then
+        # warn if not installed
+        echo "Warning: wabt is not installed. Please install wabt to generate wat files." >&2
+    else
+        # if installed, generate wat files
+        wasm2wat ${file%.c}.wasm  -o ${file%.c}.wat
+        wasm-objdump -dhs ${file%.c}.wasm > ${file%.c}.wasm.dump
+    fi
+done

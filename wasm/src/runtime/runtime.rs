@@ -68,11 +68,19 @@ impl RayRuntimeFactory {
     pub fn create_runtime(
         internal_cfg: ConfigInternal,
     ) -> Result<Box<dyn RayRuntime + Send + Sync>> {
-        let run_mode = internal_cfg.run_mode;
-        match run_mode {
-            RunMode::Cluster => Ok(Box::new(RayRuntimeClusterMode::new(internal_cfg))),
-            RunMode::SingleProcess => Ok(Box::new(RayRuntimeSingleProcessMode::new(internal_cfg))),
+        #[cfg(feature = "enable-ray-runtime")]
+        {
+            let run_mode = internal_cfg.run_mode;
+            match run_mode {
+                RunMode::Cluster => Ok(Box::new(RayRuntimeClusterMode::new(internal_cfg))),
+                RunMode::SingleProcess => {
+                    Ok(Box::new(RayRuntimeSingleProcessMode::new(internal_cfg)))
+                }
+                RunMode::Dummy => Ok(Box::new(RayRuntimeDummyMode::new(internal_cfg))),
+            }
         }
+        #[cfg(not(feature = "enable-ray-runtime"))]
+        Ok(Box::new(RayRuntimeDummyMode::new(internal_cfg)))
     }
 }
 
@@ -218,6 +226,79 @@ impl RayRuntime for RayRuntimeClusterMode {
 
     fn kv_get(&self, ns: &str, key: &str) -> Result<Vec<u8>> {
         self.gcs_client.internal_kv.get(ns, key)
+    }
+}
+
+pub struct RayRuntimeDummyMode {
+    internal_cfg: ConfigInternal,
+    runnting: bool,
+}
+
+impl RayRuntimeDummyMode {
+    pub fn new(internal_cfg: ConfigInternal) -> Self {
+        Self {
+            internal_cfg,
+            runnting: false,
+        }
+    }
+}
+
+impl RayRuntime for RayRuntimeDummyMode {
+    fn do_init(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn do_shutdown(&mut self) -> Result<()> {
+        self.runnting = false;
+        Ok(())
+    }
+
+    fn spawn_task_loop(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn is_running(&self) -> bool {
+        self.runnting
+    }
+
+    fn put_with_id(&mut self, _data: Vec<u8>, _obj_id: ObjectID) -> Result<()> {
+        Ok(())
+    }
+
+    fn put(&mut self, _data: Vec<u8>) -> Result<ObjectID> {
+        Ok(ObjectID::new())
+    }
+
+    fn get(&self, _obj_id: &ObjectID) -> Result<Vec<u8>> {
+        Ok(vec![])
+    }
+
+    fn gets(&self, _obj_ids: Vec<ObjectID>) -> Result<Vec<Vec<u8>>> {
+        Ok(vec![])
+    }
+
+    fn wait(&self, _obj_ids: Vec<ObjectID>, _num_obj: i32, _timeout: i32) -> Result<Vec<Vec<u8>>> {
+        Ok(vec![])
+    }
+
+    fn call(
+        &self,
+        _invoke_spec: &InvocationSpec,
+        _task_options: &CallOptions,
+    ) -> Result<Vec<ObjectID>> {
+        Ok(vec![])
+    }
+
+    fn exec_type(&self) -> WorkerType {
+        self.internal_cfg.worker_type
+    }
+
+    fn kv_put(&self, _ns: &str, _key: &str, _value: &[u8]) -> Result<()> {
+        Ok(())
+    }
+
+    fn kv_get(&self, _ns: &str, _key: &str) -> Result<Vec<u8>> {
+        Ok(vec![])
     }
 }
 

@@ -47,6 +47,25 @@ __attribute__((import_module("ray"), import_name("put"))) int rput(warbuffer *id
                                                                    unsigned char *buf,
                                                                    unsigned int len);
 
+__attribute__((import_module("ray"), import_name("track_malloc"))) int track_malloc(
+    void *ptr, size_t size);
+__attribute__((import_module("ray"), import_name("track_free"))) int track_free(
+    void *ptr);
+
+void *walloc(size_t size) {
+  void *ptr = malloc(size);
+  if (ptr == NULL) {
+    return NULL;
+  }
+  track_malloc(ptr, size);
+  return ptr;
+}
+
+void wfree(void *ptr) {
+  track_free(ptr);
+  free(ptr);
+}
+
 static inline unsigned int calculate_checksum(warbuffer *);
 
 static inline warbuffer *alloc_warbuffer(unsigned int type, unsigned int cap) {
@@ -135,7 +154,7 @@ static inline void *_alloc_warbuffer_with_data(unsigned int type,
 
 static inline unsigned char *fmt_hex(unsigned char *buf, unsigned int len) {
   static unsigned char hex[] = "0123456789abcdef";
-  static unsigned char hexbuf[1024];
+  static unsigned char hexbuf[4096];
   unsigned char *ptr = hexbuf;
   if (len * 3 > sizeof(hexbuf)) {
     return NULL;
@@ -155,6 +174,7 @@ static inline unsigned char *fmt_hex(unsigned char *buf, unsigned int len) {
 #define WAR_LOG(fmt, ...)                                                     \
   do {                                                                        \
     char *buf = malloc(PRINTF_BUF_SIZE);                                      \
+    buf[0] = '\0';                                                            \
     snprintf(buf, sizeof(PRINTF_BUF_SIZE), (const char *)fmt, ##__VA_ARGS__); \
     log_write(buf, PRINTF_BUF_SIZE);                                          \
     free(buf);                                                                \
@@ -165,6 +185,8 @@ static inline unsigned char *fmt_hex(unsigned char *buf, unsigned int len) {
   do {                                                                \
     char *buf = malloc(PRINTF_BUF_SIZE);                              \
     char *buf2 = malloc(PRINTF_BUF_SIZE + strlen(WARN_STR));          \
+    buf[0] = '\0';                                                    \
+    buf2[0] = '\0';                                                   \
     snprintf(buf, PRINTF_BUF_SIZE, (const char *)fmt, ##__VA_ARGS__); \
     strcpy(buf2, WARN_STR);                                           \
     strncat(buf2, buf, PRINTF_BUF_SIZE + strlen(WARN_STR) - 1);       \
@@ -178,6 +200,8 @@ static inline unsigned char *fmt_hex(unsigned char *buf, unsigned int len) {
   do {                                                                \
     char *buf = malloc(PRINTF_BUF_SIZE);                              \
     char *buf2 = malloc(PRINTF_BUF_SIZE + strlen(ERR_STR));           \
+    buf[0] = '\0';                                                    \
+    buf2[0] = '\0';                                                   \
     snprintf(buf, PRINTF_BUF_SIZE, (const char *)fmt, ##__VA_ARGS__); \
     strcpy(buf2, ERR_STR);                                            \
     strncat(buf2, buf, PRINTF_BUF_SIZE + strlen(ERR_STR) - 1);        \
@@ -191,6 +215,8 @@ static inline unsigned char *fmt_hex(unsigned char *buf, unsigned int len) {
   do {                                                                \
     char *buf = malloc(PRINTF_BUF_SIZE);                              \
     char *buf2 = malloc(PRINTF_BUF_SIZE + strlen(INFO_STR));          \
+    buf[0] = '\0';                                                    \
+    buf2[0] = '\0';                                                   \
     snprintf(buf, PRINTF_BUF_SIZE, (const char *)fmt, ##__VA_ARGS__); \
     strcpy(buf2, INFO_STR);                                           \
     strncat(buf2, buf, PRINTF_BUF_SIZE + strlen(ERR_STR) - 1);        \

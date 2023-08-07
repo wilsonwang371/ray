@@ -55,7 +55,7 @@ async fn init_engine(args: &WorkerParameters) -> Result<Box<dyn WasmEngine + Sen
         WasmEngineTypeParam::WASMTIME => WasmEngineType::WASMTIME,
         _ => unimplemented!(),
     };
-    let engine = WasmEngineFactory::create_engine(engine_type).unwrap();
+    let engine = WasmEngineFactory::create_engine(engine_type, None, vec![]).unwrap();
     engine.init().unwrap();
 
     Ok(engine)
@@ -122,13 +122,15 @@ async fn main() -> Result<()> {
         engine: Arc::new(RwLock::new(engine)),
     };
 
-    RayLog::info("register ray hostcalls");
-    // setup hostcalls
-    register_ray_hostcalls(&ctx.runtime, &ctx.engine).unwrap();
+    #[cfg(feature = "enable-ray-hostcalls")]
+    {
+        RayLog::info("register ray hostcalls");
+        // setup hostcalls
+        register_ray_hostcalls(&ctx.runtime, &ctx.engine).unwrap();
+    }
 
     init_wasm_module(&ctx.runtime, &ctx.engine).unwrap();
 
     run_task_loop(&mut ctx).await.unwrap();
-
     Ok(())
 }
